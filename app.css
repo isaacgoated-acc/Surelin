@@ -232,3 +232,11 @@ body {
 @media (max-width: 560px) {
   .download-card, .admin-download-row { align-items: flex-start; flex-direction: column; }
 }
+
+.profile-avatar { width: 76px; height: 76px; flex: none; border: 1px solid #536474; border-radius: 4px; background: #263745; object-fit: cover; }
+.profile-edit { margin-top: 18px; }
+.profile-edit textarea { min-height: 90px; padding: 10px; border: 1px solid #536474; border-radius: 3px; background: #0e171e; color: #fff; font: inherit; resize: vertical; }
+.coming-soon { padding: 9px 13px; border: 1px solid #526170; border-radius: 3px; color: #c1cbd3; font-size: .82rem; }
+.search-result { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid #354451; }
+.search-result p { margin: 4px 0; color: #a9c8e3; }
+.search-result span { color: #c1cbd3; font-size: .88rem; }

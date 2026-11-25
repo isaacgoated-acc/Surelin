@@ -11,8 +11,6 @@ alter table public.profiles add column if not exists display_name text;
 alter table public.profiles add column if not exists bio text not null default '';
 alter table public.profiles add column if not exists avatar_url text;
 alter table public.profiles add column if not exists updated_at timestamptz not null default now();
-alter table public.profiles add column if not exists updated_at timestamptz not null default now();
-do $ declare c record; begin for c in select conname from pg_constraint where conrelid = 'public.profiles'::regclass and contype = 'f' and confrelid = to_regclass('public.surelin_credentials') loop execute format('alter table public.profiles drop constraint %I', c.conname); end loop; end; $;
 alter table public.profiles drop constraint if exists profiles_id_fkey;
 alter table public.profiles enable row level security;
 create or replace function public.ensure_selected_character_owned()

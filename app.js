@@ -329,7 +329,7 @@ async function initializeAdminPanel(client, session) {
   document.querySelector("#asset-admin-form").addEventListener("submit", async event => {
     event.preventDefault();
     const values = new FormData(event.currentTarget);
-    const { error } = await client.rpc("admin_grant_asset", { target_username: String(values.get("username")).trim(), asset_type: values.get("asset_type"), asset_id: String(values.get("asset_id")).trim() });
+    const { error } = await client.rpc("admin_grant_asset", { target_username: String(values.get("username")).trim(), p_asset_type: values.get("asset_type"), p_asset_id: String(values.get("asset_id")).trim() });
     document.querySelector("#asset-admin-message").textContent = error ? error.message : "Asset granted!";
   });
   const form = document.querySelector("#create-download-form");
@@ -379,7 +379,7 @@ async function loadProfile(client, session) {
   }
   const { data: profile, error } = await client.from("profiles").select("id, username, display_name, bio, avatar_url, sura, level, selected_character_id").eq("id", userId).maybeSingle();
   if (error) {
-    card.textContent = `Could not load profile: ${error.message}. Check that the latest profile SQL has been run.`;
+    card.textContent = `Could not load profile: ${error.message}. Run supabase/sura_inventory.sql in Supabase SQL Editor.`;
     document.querySelector("#profile-edit").hidden = true;
     return;
   }

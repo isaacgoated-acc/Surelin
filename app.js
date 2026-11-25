@@ -344,6 +344,8 @@ async function initializeSupabase() {
     const indicator = document.querySelector("#auth-indicator");
     const action = document.querySelector("#account-action");
     if (data.session) {
+      const { data: isStaff } = await client.rpc("is_surelin_staff");
+      if (isStaff === true) document.querySelector("#admin-nav").style.display = "";
       indicator.textContent = `Signed in: ${data.session.user.email || "Surelin player"}`;
       action.textContent = "Sign Out";
       action.href = "login.html";

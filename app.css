@@ -240,3 +240,15 @@ body {
 .search-result { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid #354451; }
 .search-result p { margin: 4px 0; color: #a9c8e3; }
 .search-result span { color: #c1cbd3; font-size: .88rem; }
+
+.sura-count { padding: 7px 12px; border: 1px solid #9a7b31; border-radius: 4px; color: #ffd76a; font-weight: 800; }
+.nav-link[hidden] { display: none !important; }
+.search-result { display:flex; color:inherit; text-decoration:none; }
+.search-result:hover { background:#202f3b; }
+.character-stage { display:grid; justify-items:center; gap:10px; }
+.character-stage canvas { width:min(100%,520px); height:230px; display:block; border:1px solid #354451; }
+.character-stage span { color:#dce7f2; font-weight:700; }
+.inventory-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+.inventory-item { display:grid; gap:10px; padding:16px; border:1px solid #354451; background:#101820; }
+.inventory-item span { color:#a9c8e3; }
+.inventory-item button { min-height:36px; border:1px solid #718da5; background:#2b4051; color:white; cursor:pointer; }

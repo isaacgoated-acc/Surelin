@@ -1,3 +1,9 @@
+create table if not exists public.staff_accounts (account_id uuid primary key references auth.users(id) on delete cascade, level text not null check (level in ('owner','admin')));
+alter table public.staff_accounts enable row level security;
+create or replace function public.is_surelin_staff() returns boolean language sql stable security definer set search_path = public as $function$ select exists (select 1 from public.staff_accounts where account_id = auth.uid() and level in ('owner','admin')); $function$;
+revoke all on function public.is_surelin_staff() from public;
+grant execute on function public.is_surelin_staff() to anon, authenticated;
+create table if not exists public.profiles (id uuid primary key, username text not null unique, display_name text, bio text not null default '', avatar_url text, sura bigint not null default 0 check (sura >= 0), level integer not null default 1 check (level >= 1), created_at timestamptz not null default now(), updated_at timestamptz not null default now());
 alter table public.profiles add column if not exists sura bigint not null default 0;
 alter table public.profiles add column if not exists level integer not null default 1;
 alter table public.profiles add column if not exists selected_character_id integer;
@@ -5,7 +11,8 @@ alter table public.profiles add column if not exists display_name text;
 alter table public.profiles add column if not exists bio text not null default '';
 alter table public.profiles add column if not exists avatar_url text;
 alter table public.profiles add column if not exists updated_at timestamptz not null default now();
-do $ declare c record; begin for c in select conname from pg_constraint where conrelid = 'public.profiles'::regclass and contype = 'f' and confrelid = 'public.surelin_credentials'::regclass loop execute format('alter table public.profiles drop constraint %I', c.conname); end loop; end; $;
+alter table public.profiles add column if not exists updated_at timestamptz not null default now();
+do $ declare c record; begin for c in select conname from pg_constraint where conrelid = 'public.profiles'::regclass and contype = 'f' and confrelid = to_regclass('public.surelin_credentials') loop execute format('alter table public.profiles drop constraint %I', c.conname); end loop; end; $;
 alter table public.profiles drop constraint if exists profiles_id_fkey;
 alter table public.profiles enable row level security;
 create or replace function public.ensure_selected_character_owned()
@@ -85,7 +92,7 @@ returns bigint
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $function$
 declare
   target_id uuid;
   new_balance bigint;
@@ -105,14 +112,14 @@ begin
   update public.profiles set sura = new_balance, updated_at = now() where id = target_id;
   return new_balance;
 end;
-$$;
+$function$;
 
 create or replace function public.admin_grant_asset(target_username text, p_asset_type text, p_asset_id text)
 returns void
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $function$
 declare
   actor_name text;
   target_id uuid;
@@ -133,7 +140,7 @@ begin
   values (target_id, p_asset_type, p_asset_id, auth.uid())
   on conflict (player_id, asset_type, asset_id) do nothing;
 end;
-$$;
+$function$;
 
 revoke all on function public.admin_adjust_sura(text, bigint, text) from public;
 revoke all on function public.admin_grant_asset(text, text, text) from public;

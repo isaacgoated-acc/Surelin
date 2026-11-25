@@ -212,3 +212,23 @@ body {
   .sidebar { background: #17232e; }
   .nav-link { border-radius: 3px; }
 }
+
+.download-list, .admin-download-table { display: grid; gap: 12px; margin-top: 22px; }
+.download-card, .admin-download-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 18px; border: 1px solid #354451; border-radius: 3px; background: #17232e; }
+.download-card h2 { margin: 9px 0 0; }
+.download-button, .admin-form button, .danger-button { display: inline-flex; min-height: 40px; align-items: center; justify-content: center; padding: 0 16px; border: 1px solid #718da5; border-radius: 3px; background: #2b4051; color: #fff; font: inherit; text-decoration: none; cursor: pointer; }
+.download-button:hover, .admin-form button:hover { background: #354f63; }
+.admin-section { margin-top: 8px; }
+.admin-section > p, .admin-download-row span { color: #c1cbd3; font-size: .9rem; }
+.admin-form { display: grid; max-width: 620px; gap: 10px; margin: 20px 0 28px; }
+.admin-form label { margin-top: 5px; color: #d7dfe6; font-size: .9rem; }
+.admin-form input, .admin-form select { min-height: 42px; padding: 8px 10px; border: 1px solid #536474; border-radius: 3px; background: #0e171e; color: #fff; font: inherit; }
+.admin-form button { justify-self: start; margin-top: 8px; }
+.admin-download-row > div { display: grid; gap: 6px; min-width: 0; }
+.admin-download-row a { color: #a9c8e3; overflow-wrap: anywhere; font-size: .85rem; }
+.danger-button { border-color: #895d5d; background: #452b2b; }
+.danger-button:hover { background: #5a3333; }
+#admin-message { min-height: 1.3em; color: #e6c980; font-size: .88rem; }
+@media (max-width: 560px) {
+  .download-card, .admin-download-row { align-items: flex-start; flex-direction: column; }
+}

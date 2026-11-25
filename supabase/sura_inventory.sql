@@ -42,6 +42,40 @@ create policy "Players can edit their own profile" on public.profiles for update
 grant select on public.profiles to anon, authenticated;
 grant update (username, display_name, bio, avatar_url, selected_character_id) on public.profiles to authenticated;
 
+create or replace function public.create_surelin_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $profile$
+declare
+  chosen_username text;
+begin
+  chosen_username := coalesce(nullif(new.raw_user_meta_data->>'username', ''), split_part(coalesce(new.email, 'player'), '@', 1));
+  if exists (select 1 from public.profiles where lower(username) = lower(chosen_username) and id <> new.id) then
+    chosen_username := left(chosen_username, 15) || '_' || substr(new.id::text, 1, 8);
+  end if;
+  insert into public.profiles (id, username, display_name)
+  values (new.id, chosen_username, chosen_username)
+  on conflict (id) do nothing;
+  return new;
+end;
+$profile$;
+
+drop trigger if exists on_auth_user_created_surelin_profile on auth.users;
+create trigger on_auth_user_created_surelin_profile after insert on auth.users for each row execute function public.create_surelin_profile();
+
+insert into public.profiles (id, username, display_name)
+select u.id,
+  case when exists (select 1 from public.profiles p where lower(p.username) = lower(coalesce(nullif(u.raw_user_meta_data->>'username', ''), split_part(coalesce(u.email, 'player'), '@', 1))) and p.id <> u.id)
+    then left(coalesce(nullif(u.raw_user_meta_data->>'username', ''), split_part(coalesce(u.email, 'player'), '@', 1)), 15) || '_' || substr(u.id::text, 1, 8)
+    else coalesce(nullif(u.raw_user_meta_data->>'username', ''), split_part(coalesce(u.email, 'player'), '@', 1))
+  end,
+  coalesce(nullif(u.raw_user_meta_data->>'display_name', ''), nullif(u.raw_user_meta_data->>'username', ''), split_part(coalesce(u.email, 'player'), '@', 1))
+from auth.users u
+on conflict (id) do nothing;
+
+
 create table if not exists public.characters (
   id integer primary key,
   name text not null,

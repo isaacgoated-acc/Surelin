@@ -391,6 +391,7 @@ async function loadProfile(client, session) {
   const isOwn = !!session && session.user.id === userId;
   document.querySelector("#profile-edit").hidden = !isOwn;
   const name = profile.display_name || profile.username || "Surelin Player";
+  await renderCharacter(client, userId, profile.selected_character_id);
   card.innerHTML = `<div class="profile-row"><img class="profile-avatar" src="${escapeHtml(profile.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><h2>${escapeHtml(name)}</h2><p class="lead">@${escapeHtml(profile.username)}</p><p>${escapeHtml(profile.bio || "No bio yet.")}</p></div></div><div class="stat-row"><div class="stat"><strong>${Number(profile.level || 1)}</strong><span>Level</span></div><div class="stat"><strong>${Number(profile.sura || 0).toLocaleString()}</strong><span>Sura</span></div></div>`;
   if (!isOwn) return;
   const form = document.querySelector("#profile-form");
@@ -409,7 +410,6 @@ async function loadProfile(client, session) {
     message.textContent = saveError ? saveError.message : "Profile saved!";
     if (!saveError) await loadProfile(client, session);
   });
-  await renderCharacter(client, userId, profile.selected_character_id);
 }
 
 async function renderCharacter(client, userId, selectedId) {
@@ -464,6 +464,7 @@ async function loadInventory(client, session) {
     const result = await client.from("characters").select("id, name, description").in("id", ids);
     characters = result.data || [];
   }
+  const { data: ownProfile } = await client.from("profiles").select("selected_character_id").eq("id", session.user.id).maybeSingle();
   panel.innerHTML = `<h2>Your items</h2><div class="inventory-grid">${(data || []).map(item => {
     const c = characters.find(x => String(x.id) === String(item.asset_id));
     return `<article class="inventory-item"><strong>${escapeHtml(c?.name || (item.asset_type + " #" + item.asset_id))}</strong><span>${escapeHtml(item.asset_type)}</span>${item.asset_type === "character" ? `<button type="button" data-select-character="${escapeHtml(item.asset_id)}">Select character</button>` : ""}</article>`;
@@ -510,7 +511,7 @@ async function initializeSupabase() {
     if (pageName === "servers") await loadServers(client);
     if (pageName === "downloads") await loadDownloadLinks(client);
     if (pageName === "profile") await loadProfile(client, data.session);
-    if (pageName === "inventory") { await loadInventory(client, data.session); if (data.session) await renderCharacter(client, data.session.user.id, null); }
+    if (pageName === "inventory") { await loadInventory(client, data.session); if (data.session) { const { data: ownProfile } = await client.from("profiles").select("selected_character_id").eq("id", data.session.user.id).maybeSingle(); await renderCharacter(client, data.session.user.id, ownProfile?.selected_character_id); } }
     if (pageName === "search") await searchPlayers(client);
     if (pageName === "admin") await initializeAdminPanel(client, data.session);
   } catch (error) {

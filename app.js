@@ -2,6 +2,7 @@ const navigation = [
   ["home", "Home", "index.html", "⌂"],
   ["servers", "Servers", "servers.html", "▤"],
   ["downloads", "Download", "download.html", "↓"],
+  ["search", "Search", "search.html", "⌕"],
   ["admin", "Admin Panel", "admin.html", "⚙"],
   ["profile", "Profile", "profile.html", "◉"],
   ["friends", "Friends", "friends.html", "♧"],
@@ -278,15 +279,17 @@ async function loadDownloadLinks(client, adminMode = false) {
     container.textContent = "Could not load download links. Run the Surelin SQL setup file in Supabase first.";
     return;
   }
-  if (!data || data.length === 0) {
-    container.innerHTML = adminMode ? "<p>No download links yet. Add one above.</p>" : '<div class="empty-state"><h2>No downloads published yet</h2><p>Check back later for official Surelin downloads.</p></div>';
+  if (adminMode) {
+    container.innerHTML = !data || data.length === 0 ? "<p>No download links yet. Add one above.</p>" : data.map(item => `<div class="admin-download-row"><div><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.platform)} · ${item.active ? "Published" : "Hidden"}</span><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open link</a></div><button type="button" class="danger-button" data-delete-download="${escapeHtml(item.id)}">Delete</button></div>`).join("");
     return;
   }
-  if (adminMode) {
-    container.innerHTML = data.map(item => `<div class="admin-download-row"><div><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.platform)} · ${item.active ? "Published" : "Hidden"}</span><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open link</a></div><button type="button" class="danger-button" data-delete-download="${escapeHtml(item.id)}">Delete</button></div>`).join("");
-  } else {
-    container.innerHTML = data.map(item => `<article class="download-card"><div><span class="tag">${escapeHtml(item.platform)}</span><h2>${escapeHtml(item.label)}</h2></div><a class="download-button" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Download</a></article>`).join("");
-  }
+  const links = data || [];
+  const platforms = ["Windows EXE", "Android APK", "macOS", "iOS IPA"];
+  container.innerHTML = platforms.map(platform => {
+    const item = links.find(link => link.platform.toLowerCase() === platform.toLowerCase() || (platform === "Windows EXE" && link.platform.toLowerCase() === "windows") || (platform === "Android APK" && link.platform.toLowerCase() === "android"));
+    const comingSoon = platform === "macOS" || platform === "iOS IPA";
+    return `<article class="download-card"><div><span class="tag">${escapeHtml(platform)}</span><h2>${comingSoon ? "Coming Soon" : item ? escapeHtml(item.label) : "Not available yet"}</h2></div>${item && !comingSoon ? `<a class="download-button" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Download</a>` : '<span class="coming-soon">Coming Soon</span>'}</article>`;
+  }).join("");
 }
 
 async function initializeAdminPanel(client, session) {
@@ -336,6 +339,86 @@ async function initializeAdminPanel(client, session) {
   await loadDownloadLinks(client, true);
 }
 
+
+async function loadProfile(client, session) {
+  const card = document.querySelector("#profile-card");
+  if (!card) return;
+  if (!session) {
+    card.innerHTML = '<div class="empty-state"><h2>Log in to view your profile</h2><a href="login.html">Log in</a></div>';
+    document.querySelector("#profile-edit").hidden = true;
+    return;
+  }
+  const user = session.user;
+  let { data: profile, error } = await client.from("profiles").select("id, username, display_name, bio, avatar_url, sura, level").eq("id", user.id).maybeSingle();
+  if (error) {
+    card.textContent = "Profile database setup is needed. Run supabase/profile_search.sql in Supabase SQL Editor.";
+    return;
+  }
+  if (!profile) {
+    const username = user.user_metadata?.username || user.email?.split("@")[0] || "Player";
+    const result = await client.from("profiles").upsert({ id: user.id, username, display_name: username }, { onConflict: "id" }).select().single();
+    if (result.error) {
+      card.textContent = result.error.message;
+      return;
+    }
+    profile = result.data;
+  }
+  const name = profile.display_name || profile.username || "Surelin Player";
+  card.innerHTML = `<div class="profile-row"><img class="profile-avatar" src="${escapeHtml(profile.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><h2>${escapeHtml(name)}</h2><p class="lead">@${escapeHtml(profile.username)}</p><p>${escapeHtml(profile.bio || "No bio yet.")}</p></div></div><div class="stat-row"><div class="stat"><strong>${Number(profile.level || 1)}</strong><span>Level</span></div><div class="stat"><strong>${Number(profile.sura || 0).toLocaleString()}</strong><span>Sura</span></div></div>`;
+  const form = document.querySelector("#profile-form");
+  form.elements.username.value = profile.username || "";
+  form.elements.bio.value = profile.bio || "";
+  form.elements.avatar_url.value = profile.avatar_url || "";
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const message = document.querySelector("#profile-message");
+    const values = new FormData(form);
+    const username = String(values.get("username") || "").trim();
+    const avatar_url = String(values.get("avatar_url") || "").trim();
+    if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) {
+      message.textContent = "Username must be 3–24 letters, numbers, or underscores.";
+      return;
+    }
+    if (avatar_url && !avatar_url.startsWith("https://")) {
+      message.textContent = "Avatar URL must start with https://.";
+      return;
+    }
+    const { error: saveError } = await client.from("profiles").update({ username, display_name: username, bio: String(values.get("bio") || "").trim(), avatar_url: avatar_url || null }).eq("id", user.id);
+    message.textContent = saveError ? saveError.message : "Profile saved!";
+    if (!saveError) await loadProfileCard(client, user.id);
+  });
+}
+
+async function loadProfileCard(client, userId) {
+  const { data } = await client.from("profiles").select("username, display_name, bio, avatar_url, sura, level").eq("id", userId).maybeSingle();
+  if (!data) return;
+  const card = document.querySelector("#profile-card");
+  const name = data.display_name || data.username || "Surelin Player";
+  card.innerHTML = `<div class="profile-row"><img class="profile-avatar" src="${escapeHtml(data.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><h2>${escapeHtml(name)}</h2><p class="lead">@${escapeHtml(data.username)}</p><p>${escapeHtml(data.bio || "No bio yet.")}</p></div></div><div class="stat-row"><div class="stat"><strong>${Number(data.level || 1)}</strong><span>Level</span></div><div class="stat"><strong>${Number(data.sura || 0).toLocaleString()}</strong><span>Sura</span></div></div>`;
+}
+
+async function searchPlayers(client) {
+  const form = document.querySelector("#search-form");
+  if (!form) return;
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const output = document.querySelector("#search-results");
+    const query = String(new FormData(form).get("query") || "").trim();
+    if (query.length < 2) return;
+    output.textContent = "Searching...";
+    const { data, error } = await client.from("profiles").select("username, display_name, bio, avatar_url").ilike("username", `%${query}%`).limit(25);
+    if (error) {
+      output.textContent = "Could not search players. Run the profile/search SQL setup first.";
+      return;
+    }
+    if (!data || data.length === 0) {
+      output.innerHTML = '<div class="empty-state">No players found.</div>';
+      return;
+    }
+    output.innerHTML = data.map(profile => `<article class="search-result"><img class="profile-avatar" src="${escapeHtml(profile.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><strong>${escapeHtml(profile.display_name || profile.username)}</strong><p>@${escapeHtml(profile.username)}</p><span>${escapeHtml(profile.bio || "")}</span></div></article>`).join("");
+  });
+}
+
 async function initializeSupabase() {
   try {
     const client = await getSupabaseClient();
@@ -362,7 +445,7 @@ async function initializeSupabase() {
       indicator.textContent = "Not signed in";
     }
     if (pageName === "servers") await loadServers(client);
-    if (pageName === "downloads") await loadDownloadLinks(client);
+    if (pageName === "downloads") await loadDownloadLinks(client);\n    if (pageName === "profile") await loadProfile(client, data.session);\n    if (pageName === "search") await searchPlayers(client);
     if (pageName === "admin") await initializeAdminPanel(client, data.session);
   } catch (error) {
     const container = document.querySelector("#servers-list");

@@ -18,7 +18,7 @@ returns trigger
 language plpgsql
 security definer
 set search_path = public
-as $
+as $trigger$
 begin
   if new.selected_character_id is not null and not exists (
     select 1 from public.player_inventory
@@ -28,7 +28,7 @@ begin
   end if;
   return new;
 end;
-$;
+$trigger$;
 drop trigger if exists profiles_selected_character_owned on public.profiles;
 create trigger profiles_selected_character_owned before update of selected_character_id on public.profiles for each row execute function public.ensure_selected_character_owned();
 

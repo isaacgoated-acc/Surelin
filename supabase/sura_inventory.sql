@@ -4,9 +4,29 @@ alter table public.profiles add column if not exists selected_character_id integ
 alter table public.profiles add column if not exists display_name text;
 alter table public.profiles add column if not exists bio text not null default '';
 alter table public.profiles add column if not exists avatar_url text;
+alter table public.profiles add column if not exists updated_at timestamptz not null default now();
 do $ declare c record; begin for c in select conname from pg_constraint where conrelid = 'public.profiles'::regclass and contype = 'f' and confrelid = 'public.surelin_credentials'::regclass loop execute format('alter table public.profiles drop constraint %I', c.conname); end loop; end; $;
 alter table public.profiles drop constraint if exists profiles_id_fkey;
 alter table public.profiles enable row level security;
+create or replace function public.ensure_selected_character_owned()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $
+begin
+  if new.selected_character_id is not null and not exists (
+    select 1 from public.player_inventory
+    where player_id = new.id and asset_type = 'character' and asset_id = new.selected_character_id::text
+  ) then
+    raise exception 'You do not own that character';
+  end if;
+  return new;
+end;
+$;
+drop trigger if exists profiles_selected_character_owned on public.profiles;
+create trigger profiles_selected_character_owned before update of selected_character_id on public.profiles for each row execute function public.ensure_selected_character_owned();
+
 
 drop policy if exists "Profiles are publicly viewable" on public.profiles;
 create policy "Profiles are publicly viewable" on public.profiles for select to anon, authenticated using (true);

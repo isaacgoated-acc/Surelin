@@ -284,17 +284,26 @@ async function loadServers(client) {
   container.replaceChildren(list);
 }
 
-async function loadDownloadLinks(client) {
-  const container = document.querySelector("#download-list");
+async function loadDownloadLinks(client, adminMode = false) {
+  const container = document.querySelector(adminMode ? "#admin-download-table" : "#download-list");
   if (!container) return;
-  const releaseUrl = "https://github.com/isaacgoated-acc/Surelin/releases/tag/surelinfirstver";
-  const platforms = [
-    ["Windows EXE", "Download from GitHub Releases", true],
-    ["Android APK", "Download from GitHub Releases", true],
-    ["macOS", "Coming Soon", false],
-    ["iOS IPA", "Coming Soon", false]
-  ];
-  container.innerHTML = platforms.map(([platform, label, available]) => `<article class="download-card"><div><span class="tag">${escapeHtml(platform)}</span><h2>${label}</h2></div>${available ? `<a class="download-button" href="${releaseUrl}" target="_blank" rel="noopener noreferrer">Download</a>` : '<span class="coming-soon">Coming Soon</span>'}</article>`).join("");
+  if (!adminMode) {
+    const releaseUrl = "https://github.com/isaacgoated-acc/Surelin/releases/tag/surelinfirstver";
+    const platforms = [
+      ["Windows EXE", "Download from GitHub Releases", true],
+      ["Android APK", "Download from GitHub Releases", true],
+      ["macOS", "Coming Soon", false],
+      ["iOS IPA", "Coming Soon", false]
+    ];
+    container.innerHTML = platforms.map(([platform, label, available]) => `<article class="download-card"><div><span class="tag">${escapeHtml(platform)}</span><h2>${label}</h2></div>${available ? `<a class="download-button" href="${releaseUrl}" target="_blank" rel="noopener noreferrer">Download</a>` : '<span class="coming-soon">Coming Soon</span>'}</article>`).join("");
+    return;
+  }
+  const { data, error } = await client.from("download_links").select("id, platform, label, url, active, created_at").order("created_at", { ascending: false });
+  if (error) {
+    container.textContent = "Could not load admin download links.";
+    return;
+  }
+  container.innerHTML = !data || data.length === 0 ? "<p>No download links yet. Add one above.</p>" : data.map(item => `<div class="admin-download-row"><div><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.platform)} · ${item.active ? "Published" : "Hidden"}</span><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open link</a></div><button type="button" class="danger-button" data-delete-download="${escapeHtml(item.id)}">Delete</button></div>`).join("");
 }
 
 async function initializeAdminPanel(client, session) {

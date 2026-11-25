@@ -284,26 +284,17 @@ async function loadServers(client) {
   container.replaceChildren(list);
 }
 
-async function loadDownloadLinks(client, adminMode = false) {
-  const container = document.querySelector(adminMode ? "#admin-download-table" : "#download-list");
+async function loadDownloadLinks(client) {
+  const container = document.querySelector("#download-list");
   if (!container) return;
-  const query = client.from("download_links").select("id, platform, label, url, active, created_at").order("created_at", { ascending: false });
-  const { data, error } = await (adminMode ? query : query.eq("active", true));
-  if (error) {
-    container.textContent = "Could not load download links. Run the Surelin SQL setup file in Supabase first.";
-    return;
-  }
-  if (adminMode) {
-    container.innerHTML = !data || data.length === 0 ? "<p>No download links yet. Add one above.</p>" : data.map(item => `<div class="admin-download-row"><div><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.platform)} · ${item.active ? "Published" : "Hidden"}</span><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open link</a></div><button type="button" class="danger-button" data-delete-download="${escapeHtml(item.id)}">Delete</button></div>`).join("");
-    return;
-  }
-  const links = data || [];
-  const platforms = ["Windows EXE", "Android APK", "macOS", "iOS IPA"];
-  container.innerHTML = platforms.map(platform => {
-    const item = links.find(link => link.platform.toLowerCase() === platform.toLowerCase() || (platform === "Windows EXE" && link.platform.toLowerCase() === "windows") || (platform === "Android APK" && link.platform.toLowerCase() === "android"));
-    const comingSoon = platform === "macOS" || platform === "iOS IPA";
-    return `<article class="download-card"><div><span class="tag">${escapeHtml(platform)}</span><h2>${comingSoon ? "Coming Soon" : item ? escapeHtml(item.label) : "Not available yet"}</h2></div>${item && !comingSoon ? `<a class="download-button" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Download</a>` : '<span class="coming-soon">Coming Soon</span>'}</article>`;
-  }).join("");
+  const releaseUrl = "https://github.com/isaacgoated-acc/Surelin/releases/tag/surelinfirstver";
+  const platforms = [
+    ["Windows EXE", "Download from GitHub Releases", true],
+    ["Android APK", "Download from GitHub Releases", true],
+    ["macOS", "Coming Soon", false],
+    ["iOS IPA", "Coming Soon", false]
+  ];
+  container.innerHTML = platforms.map(([platform, label, available]) => `<article class="download-card"><div><span class="tag">${escapeHtml(platform)}</span><h2>${label}</h2></div>${available ? `<a class="download-button" href="${releaseUrl}" target="_blank" rel="noopener noreferrer">Download</a>` : '<span class="coming-soon">Coming Soon</span>'}</article>`).join("");
 }
 
 async function initializeAdminPanel(client, session) {

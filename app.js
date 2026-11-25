@@ -20,11 +20,11 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_jHUW9hEpKyQcz6BSt6hj-Q_O7hhsbBd
 let supabaseClientPromise;
 
 const badges = [
-  ["Friendship", "Get 1 friend!", "friendship.png", "Social"],
-  ["First Game", "Your first step into making and sharing games.", "first-game.png", "Creator"],
-  ["Owner", "The red crown marks the Surelin owner.", "owner.png", "Special"],
-  ["Used to Be Rich", "You once had a lot of Sura...", "used-to-be-rich.png", "Sura"],
-  ["Richest Player", "Have the most Sura!", "richest-player.png", "Sura"]
+  ["Friendship", "Get 1 friend!", "Friendship Achievement Badge(1).png", "Social"],
+  ["First Game", "Your first step into making and sharing games.", "First Game Achievement Badge(2).png", "Creator"],
+  ["Owner", "The red crown marks the Surelin owner.", "Red Crown Owner Badge(1).png", "Special"],
+  ["Used to Be Rich", "You once had a lot of Sura...", "Used to be Rich Achievement Badge(1).png", "Sura"],
+  ["Richest Player", "Have the most Sura!", "Richest Player Achievement Badge(1).png", "Sura"]
 ];
 
 const pages = {
@@ -62,7 +62,7 @@ const pages = {
     eyebrow: "Player",
     heading: "Profile",
     lead: "Your public player card and achievement showcase.",
-    render: () => `<section id="profile-card" class="feature-card"><p>Loading your profile...</p></section><section id="profile-edit" class="feature-card profile-edit"><h2>Edit profile</h2><form id="profile-form" class="admin-form"><label for="profile-username">Username</label><input id="profile-username" name="username" maxlength="24" required><label for="profile-bio">Bio</label><textarea id="profile-bio" name="bio" maxlength="180"></textarea><label for="profile-avatar">Avatar image URL</label><input id="profile-avatar" name="avatar_url" type="url" placeholder="https://..."><button type="submit">Save profile</button><p id="profile-message" role="status"></p></form></section><div class="section-heading"><h2>Badge showcase</h2><a href="badges.html">Browse badges</a></div>${badgeCards(badges.slice(0, 3))}`
+    render: () => `<section id="profile-card" class="feature-card"><p>Loading your profile...</p></section><section id="character-preview" class="feature-card character-preview"><h2>Selected character</h2><div id="character-renderer">Loading character preview...</div></section><section id="profile-edit" class="feature-card profile-edit"><h2>Edit profile</h2><form id="profile-form" class="admin-form"><label for="profile-username">Username</label><input id="profile-username" name="username" maxlength="24" required><label for="profile-bio">Bio</label><textarea id="profile-bio" name="bio" maxlength="180"></textarea><label for="profile-avatar">Avatar image URL</label><input id="profile-avatar" name="avatar_url" type="url" placeholder="https://..."><button type="submit">Save profile</button><p id="profile-message" role="status"></p></form></section><div class="section-heading"><h2>Badge showcase</h2><a href="badges.html">Browse badges</a></div>${badgeCards(badges.slice(0, 3))}`
   },
   downloads: {
     title: "Download",
@@ -82,7 +82,7 @@ const pages = {
     title: "Admin Panel",
     eyebrow: "Staff only",
     heading: "Admin Panel",
-    lead: "Manage Surelin platform download links.",
+    lead: "Manage Sura, characters, items, cosmetics, and downloads.",
     render: () => `<section id="admin-panel" class="feature-card"><p>Checking staff permissions...</p></section>`
   },
   friends: {
@@ -97,7 +97,7 @@ const pages = {
     eyebrow: "Collection",
     heading: "Inventory",
     lead: "Characters, cosmetics, badges, and passes you own.",
-    render: () => `<div class="empty-state"><h2>Your collection will appear here</h2><p>This website does not yet load saved ownership from the game account. No items are being presented as owned.</p><a href="badges.html">Browse achievement badges</a></div>`
+    render: () => `<section id="inventory-list" class="feature-card"><p>Loading your collection...</p></section><section id="character-preview" class="feature-card character-preview"><h2>Character preview</h2><div id="character-renderer">Loading character preview...</div></section>`
   },
   shop: {
     title: "Shop",
@@ -165,7 +165,7 @@ function accountForm(isSignup) {
 function badgeCards(items) {
   return `<section class="card-grid" aria-label="Achievement badges">${items.map(([name, description, image, category]) => `
     <article class="card">
-      <div class="badge-art"><img src="../Assets/Badges/${image}" alt="${escapeHtml(name)} achievement badge"></div>
+      <div class="badge-art"><img src="assets/badges/${encodeURIComponent(image)}" alt="${escapeHtml(name)} achievement badge"></div>
       <div class="card-body"><h2>${escapeHtml(name)}</h2><p>${escapeHtml(description)}</p><span class="tag">${escapeHtml(category)}</span></div>
     </article>`).join("")}</section>`;
 }
@@ -191,7 +191,7 @@ document.querySelector("#app").innerHTML = `
       <div class="sidebar-bottom">Local preview<br><a href="https://www.youtube.com/@isaacgoatedofficial">isaacgoated</a></div>
     </aside>
     <div class="main">
-      <header class="topbar"><span class="breadcrumb">Surelin <span aria-hidden="true">/</span> ${page.title}</span><span id="auth-indicator" aria-live="polite">Checking account...</span><a id="account-action" href="login.html">Log In</a></header>
+      <header class="topbar"><span class="breadcrumb">Surelin <span aria-hidden="true">/</span> ${page.title}</span><span id="auth-indicator" aria-live="polite">Checking account...</span><span id="sura-count" class="sura-count" hidden>0 Sura</span><a id="account-action" href="login.html">Log In</a></header>
       <main class="content">
         <span class="eyebrow">${page.eyebrow}</span>
         <h1>${page.heading}</h1>
@@ -357,28 +357,29 @@ async function initializeAdminPanel(client, session) {
 async function loadProfile(client, session) {
   const card = document.querySelector("#profile-card");
   if (!card) return;
-  if (!session) {
+  const requestedId = new URLSearchParams(location.search).get("user");
+  const userId = requestedId || session?.user?.id;
+  if (!userId) {
     card.innerHTML = '<div class="empty-state"><h2>Log in to view your profile</h2><a href="login.html">Log in</a></div>';
     document.querySelector("#profile-edit").hidden = true;
     return;
   }
-  const user = session.user;
-  let { data: profile, error } = await client.from("profiles").select("id, username, display_name, bio, avatar_url, sura, level").eq("id", user.id).maybeSingle();
+  const { data: profile, error } = await client.from("profiles").select("id, username, display_name, bio, avatar_url, sura, level, selected_character_id").eq("id", userId).maybeSingle();
   if (error) {
-    card.textContent = "Profile database setup is needed. Run supabase/profile_search.sql in Supabase SQL Editor.";
+    card.textContent = `Could not load profile: ${error.message}. Check that the latest profile SQL has been run.`;
+    document.querySelector("#profile-edit").hidden = true;
     return;
   }
   if (!profile) {
-    const username = user.user_metadata?.username || user.email?.split("@")[0] || "Player";
-    const result = await client.from("profiles").upsert({ id: user.id, username, display_name: username }, { onConflict: "id" }).select().single();
-    if (result.error) {
-      card.textContent = result.error.message;
-      return;
-    }
-    profile = result.data;
+    card.innerHTML = '<div class="empty-state">This player profile does not exist.</div>';
+    document.querySelector("#profile-edit").hidden = true;
+    return;
   }
+  const isOwn = !!session && session.user.id === userId;
+  document.querySelector("#profile-edit").hidden = !isOwn;
   const name = profile.display_name || profile.username || "Surelin Player";
   card.innerHTML = `<div class="profile-row"><img class="profile-avatar" src="${escapeHtml(profile.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><h2>${escapeHtml(name)}</h2><p class="lead">@${escapeHtml(profile.username)}</p><p>${escapeHtml(profile.bio || "No bio yet.")}</p></div></div><div class="stat-row"><div class="stat"><strong>${Number(profile.level || 1)}</strong><span>Level</span></div><div class="stat"><strong>${Number(profile.sura || 0).toLocaleString()}</strong><span>Sura</span></div></div>`;
+  if (!isOwn) return;
   const form = document.querySelector("#profile-form");
   form.elements.username.value = profile.username || "";
   form.elements.bio.value = profile.bio || "";
@@ -389,29 +390,127 @@ async function loadProfile(client, session) {
     const values = new FormData(form);
     const username = String(values.get("username") || "").trim();
     const avatar_url = String(values.get("avatar_url") || "").trim();
-    if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) {
-      message.textContent = "Username must be 3–24 letters, numbers, or underscores.";
-      return;
-    }
-    if (avatar_url && !avatar_url.startsWith("https://")) {
-      message.textContent = "Avatar URL must start with https://.";
-      return;
-    }
-    const { error: saveError } = await client.from("profiles").update({ username, display_name: username, bio: String(values.get("bio") || "").trim(), avatar_url: avatar_url || null }).eq("id", user.id);
+    if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) { message.textContent = "Username must be 3–24 letters, numbers, or underscores."; return; }
+    if (avatar_url && !avatar_url.startsWith("https://")) { message.textContent = "Avatar URL must start with https://."; return; }
+    const { error: saveError } = await client.from("profiles").update({ username, display_name: username, bio: String(values.get("bio") || "").trim(), avatar_url: avatar_url || null }).eq("id", userId);
     message.textContent = saveError ? saveError.message : "Profile saved!";
-    if (!saveError) await loadProfileCard(client, user.id);
+    if (!saveError) await loadProfile(client, session);
+  });
+  await renderCharacter(client, userId, profile.selected_character_id);
+}
+
+async function renderCharacter(client, userId, selectedId) {
+  const target = document.querySelector("#character-renderer");
+  if (!target) return;
+  const { data: character } = await client.from("characters").select("id, name, color").eq("id", selectedId || 0).maybeSingle();
+  const label = character?.name || "Default Character";
+  target.innerHTML = `<div class="character-stage"><canvas id="character-canvas"></canvas><span>${escapeHtml(label)}</span></div>`;
+  try {
+    const THREE = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js");
+    const canvas = document.querySelector("#character-canvas");
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color("#17232e");
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
+    camera.position.set(3, 2.2, 4);
+    camera.lookAt(0, 1, 0);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const resize = () => { const w = canvas.clientWidth || 320; const h = 230; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+    resize();
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
+    const light = new THREE.DirectionalLight(0xffffff, 2);
+    light.position.set(3, 5, 4);
+    scene.add(light);
+    const material = new THREE.MeshStandardMaterial({ color: character?.color || "#8db4d8", roughness: 0.65 });
+    const skin = new THREE.MeshStandardMaterial({ color: "#e5c2a2" });
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.65, 4, 8), material);
+    body.position.y = 0.9;
+    scene.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 18), skin);
+    head.position.y = 1.85;
+    scene.add(head);
+    const floor = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.08, 40), new THREE.MeshStandardMaterial({ color: "#34495a" }));
+    floor.position.y = 0.05;
+    scene.add(floor);
+    renderer.render(scene, camera);
+    window.addEventListener("resize", resize);
+  } catch (error) {
+    target.insertAdjacentHTML("beforeend", '<p class="notice">3D preview needs WebGL support.</p>');
+  }
+}
+
+async function loadInventory(client, session) {
+  const panel = document.querySelector("#inventory-list");
+  if (!panel) return;
+  if (!session) { panel.innerHTML = '<div class="empty-state">Log in to view your inventory.</div>'; return; }
+  const { data, error } = await client.from("player_inventory").select("asset_type, asset_id, created_at").eq("player_id", session.user.id).order("created_at", { ascending: false });
+  if (error) { panel.textContent = `Could not load inventory: ${error.message}`; return; }
+  const ids = [...new Set((data || []).filter(x => x.asset_type === "character").map(x => Number(x.asset_id)))];
+  let characters = [];
+  if (ids.length) {
+    const result = await client.from("characters").select("id, name, description").in("id", ids);
+    characters = result.data || [];
+  }
+  panel.innerHTML = `<h2>Your items</h2><div class="inventory-grid">${(data || []).map(item => {
+    const c = characters.find(x => String(x.id) === String(item.asset_id));
+    return `<article class="inventory-item"><strong>${escapeHtml(c?.name || (item.asset_type + " #" + item.asset_id))}</strong><span>${escapeHtml(item.asset_type)}</span>${item.asset_type === "character" ? `<button type="button" data-select-character="${escapeHtml(item.asset_id)}">Select character</button>` : ""}</article>`;
+  }).join("") || "<p>Your inventory is empty.</p>"}</div>`;
+  panel.addEventListener("click", async event => {
+    const button = event.target.closest("[data-select-character]");
+    if (!button) return;
+    const { error: updateError } = await client.from("profiles").update({ selected_character_id: Number(button.dataset.selectCharacter) }).eq("id", session.user.id);
+    if (updateError) { panel.insertAdjacentHTML("beforeend", `<p class="notice">${escapeHtml(updateError.message)}</p>`); return; }
+    await renderCharacter(client, session.user.id, Number(button.dataset.selectCharacter));
   });
 }
 
-async function loadProfileCard(client, userId) {
-  const { data } = await client.from("profiles").select("username, display_name, bio, avatar_url, sura, level").eq("id", userId).maybeSingle();
-  if (!data) return;
-  const card = document.querySelector("#profile-card");
-  const name = data.display_name || data.username || "Surelin Player";
-  card.innerHTML = `<div class="profile-row"><img class="profile-avatar" src="${escapeHtml(data.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><h2>${escapeHtml(name)}</h2><p class="lead">@${escapeHtml(data.username)}</p><p>${escapeHtml(data.bio || "No bio yet.")}</p></div></div><div class="stat-row"><div class="stat"><strong>${Number(data.level || 1)}</strong><span>Level</span></div><div class="stat"><strong>${Number(data.sura || 0).toLocaleString()}</strong><span>Sura</span></div></div>`;
+async function initializeSupabase() {
+  try {
+    const client = await getSupabaseClient();
+    const { data, error } = await client.auth.getSession();
+    if (error) throw error;
+    const indicator = document.querySelector("#auth-indicator");
+    const action = document.querySelector("#account-action");
+    if (data.session) {
+      const { data: isStaff } = await client.rpc("is_surelin_staff");
+      if (isStaff === true) document.querySelector("#admin-nav").style.display = "";
+      indicator.textContent = `Signed in: ${data.session.user.email || "Surelin player"}`;
+      document.querySelector("#sura-count").hidden = false;
+      const { data: balance } = await client.from("profiles").select("sura").eq("id", data.session.user.id).maybeSingle();
+      document.querySelector("#sura-count").textContent = `${Number(balance?.sura || 0).toLocaleString()} Sura`;
+      document.querySelectorAll(".nav-link[href=\"login.html\"], .nav-link[href=\"signup.html\"]").forEach(link => link.hidden = true);
+      if (pageName === "login" || pageName === "signup") window.location.replace("index.html");
+      action.textContent = "Sign Out";
+      action.href = "login.html";
+      action.addEventListener("click", async event => {
+        event.preventDefault();
+        const { error: signOutError } = await client.auth.signOut();
+        if (signOutError) {
+          indicator.textContent = `Could not sign out: ${signOutError.message}`;
+          return;
+        }
+        window.location.href = "login.html";
+      });
+    } else {
+      indicator.textContent = "Not signed in";
+    }
+    if (pageName === "servers") await loadServers(client);
+    if (pageName === "downloads") await loadDownloadLinks(client);
+    if (pageName === "profile") await loadProfile(client, data.session);
+    if (pageName === "inventory") { await loadInventory(client, data.session); if (data.session) await renderCharacter(client, data.session.user.id, null); }
+    if (pageName === "search") await searchPlayers(client);
+    if (pageName === "admin") await initializeAdminPanel(client, data.session);
+  } catch (error) {
+    const container = document.querySelector("#servers-list");
+    if (container) container.textContent = `Could not connect to Supabase: ${error.message}`;
+    const message = document.querySelector("#account-message");
+    if (message) message.textContent = `Could not connect to Supabase: ${error.message}`;
+    const indicator = document.querySelector("#auth-indicator");
+    if (indicator) indicator.textContent = "Account status unavailable";
+  }
 }
 
-async function searchPlayers(client) {
+initializeSupabase();async function searchPlayers(client) {
   const form = document.querySelector("#search-form");
   if (!form) return;
   form.addEventListener("submit", async event => {
@@ -420,16 +519,10 @@ async function searchPlayers(client) {
     const query = String(new FormData(form).get("query") || "").trim();
     if (query.length < 2) return;
     output.textContent = "Searching...";
-    const { data, error } = await client.from("profiles").select("username, display_name, bio, avatar_url").ilike("username", `%${query}%`).limit(25);
-    if (error) {
-      output.textContent = "Could not search players. Run the profile/search SQL setup first.";
-      return;
-    }
-    if (!data || data.length === 0) {
-      output.innerHTML = '<div class="empty-state">No players found.</div>';
-      return;
-    }
-    output.innerHTML = data.map(profile => `<article class="search-result"><img class="profile-avatar" src="${escapeHtml(profile.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><strong>${escapeHtml(profile.display_name || profile.username)}</strong><p>@${escapeHtml(profile.username)}</p><span>${escapeHtml(profile.bio || "")}</span></div></article>`).join("");
+    const { data, error } = await client.from("profiles").select("id, username, display_name, bio, avatar_url").ilike("username", `%${query}%`).limit(25);
+    if (error) { output.textContent = `Could not search players: ${error.message}`; return; }
+    if (!data?.length) { output.innerHTML = '<div class="empty-state">No players found.</div>'; return; }
+    output.innerHTML = data.map(p => `<a class="search-result" href="profile.html?user=${encodeURIComponent(p.id)}"><img class="profile-avatar" src="${escapeHtml(p.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><strong>${escapeHtml(p.display_name || p.username)}</strong><p>@${escapeHtml(p.username)}</p><span>${escapeHtml(p.bio || "")}</span></div></a>`).join("");
   });
 }
 

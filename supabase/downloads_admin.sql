@@ -1,3 +1,10 @@
+create table if not exists public.staff_accounts (
+  account_id uuid primary key references auth.users(id) on delete cascade,
+  level text not null check (level in ('owner', 'admin'))
+);
+
+alter table public.staff_accounts enable row level security;
+
 create or replace function public.is_surelin_staff()
 returns boolean
 language sql

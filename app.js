@@ -450,7 +450,9 @@ async function initializeSupabase() {
       indicator.textContent = "Not signed in";
     }
     if (pageName === "servers") await loadServers(client);
-    if (pageName === "downloads") await loadDownloadLinks(client);\n    if (pageName === "profile") await loadProfile(client, data.session);\n    if (pageName === "search") await searchPlayers(client);
+    if (pageName === "downloads") await loadDownloadLinks(client);
+    if (pageName === "profile") await loadProfile(client, data.session);
+    if (pageName === "search") await searchPlayers(client);
     if (pageName === "admin") await initializeAdminPanel(client, data.session);
   } catch (error) {
     const container = document.querySelector("#servers-list");

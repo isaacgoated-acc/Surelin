@@ -14,7 +14,7 @@ as $$
 $$;
 
 revoke all on function public.is_surelin_staff() from public;
-grant execute on function public.is_surelin_staff() to authenticated;
+grant execute on function public.is_surelin_staff() to anon, authenticated;
 
 create table if not exists public.download_links (
   id uuid primary key default gen_random_uuid(),

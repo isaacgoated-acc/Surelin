@@ -1,5 +1,5 @@
 create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
+  id uuid primary key,
   username text not null unique,
   display_name text,
   bio text not null default '',
@@ -10,6 +10,7 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
+alter table public.profiles drop constraint if exists profiles_id_fkey;
 alter table public.profiles enable row level security;
 
 drop policy if exists "Profiles are publicly viewable" on public.profiles;
@@ -41,7 +42,10 @@ as $$
 declare
   chosen_username text;
 begin
-  chosen_username := coalesce(nullif(new.raw_user_meta_data->>'username', ''), split_part(new.email, '@', 1));
+  chosen_username := coalesce(nullif(new.raw_user_meta_data->>'username', ''), split_part(coalesce(new.email, 'player'), '@', 1));
+  if exists (select 1 from public.profiles where username = chosen_username and id <> new.id) then
+    chosen_username := left(chosen_username, 15) || '_' || substr(new.id::text, 1, 8);
+  end if;
   insert into public.profiles (id, username, display_name)
   values (new.id, chosen_username, chosen_username)
   on conflict (id) do nothing;
@@ -55,8 +59,13 @@ after insert on auth.users
 for each row execute function public.create_surelin_profile();
 
 insert into public.profiles (id, username, display_name)
-select id,
-       coalesce(nullif(raw_user_meta_data->>'username', ''), split_part(email, '@', 1)),
-       coalesce(nullif(raw_user_meta_data->>'display_name', ''), nullif(raw_user_meta_data->>'username', ''), split_part(email, '@', 1))
-from auth.users
+select
+  users.id,
+  case
+    when exists (select 1 from public.profiles p where p.username = coalesce(nullif(users.raw_user_meta_data->>'username', ''), split_part(coalesce(users.email, 'player'), '@', 1)) and p.id <> users.id)
+      then left(coalesce(nullif(users.raw_user_meta_data->>'username', ''), split_part(coalesce(users.email, 'player'), '@', 1)), 15) || '_' || substr(users.id::text, 1, 8)
+    else coalesce(nullif(users.raw_user_meta_data->>'username', ''), split_part(coalesce(users.email, 'player'), '@', 1))
+  end,
+  coalesce(nullif(users.raw_user_meta_data->>'display_name', ''), nullif(users.raw_user_meta_data->>'username', ''), split_part(coalesce(users.email, 'player'), '@', 1))
+from auth.users users
 on conflict (id) do nothing;

@@ -62,14 +62,28 @@ const pages = {
     eyebrow: "Player",
     heading: "Profile",
     lead: "Your public player card and achievement showcase.",
-    render: () => `
-      <section class="feature-card">
-        <div class="profile-row"><div class="avatar" aria-hidden="true">S</div><div><h2>Surelin Player</h2><p class="lead">Profile details are not connected yet.</p></div></div>
-        <div class="stat-row"><div class="stat"><strong>—</strong><span>Level</span></div><div class="stat"><strong>—</strong><span>Sura</span></div><div class="stat"><strong>—</strong><span>Friends</span></div></div>
-      </section>
-      <div class="section-heading"><h2>Badge showcase</h2><a href="badges.html">Browse badges</a></div>
-      ${badgeCards(badges.slice(0, 3))}
-      <div class="notice">Authentication is connected, but live profile values are not yet loaded from the game account data.</div>`
+    render: () => `<section id="profile-card" class="feature-card"><p>Loading your profile...</p></section><section id="profile-edit" class="feature-card profile-edit"><h2>Edit profile</h2><form id="profile-form" class="admin-form"><label for="profile-username">Username</label><input id="profile-username" name="username" maxlength="24" required><label for="profile-bio">Bio</label><textarea id="profile-bio" name="bio" maxlength="180"></textarea><label for="profile-avatar">Avatar image URL</label><input id="profile-avatar" name="avatar_url" type="url" placeholder="https://..."><button type="submit">Save profile</button><p id="profile-message" role="status"></p></form></section><div class="section-heading"><h2>Badge showcase</h2><a href="badges.html">Browse badges</a></div>${badgeCards(badges.slice(0, 3))}`
+  },
+  downloads: {
+    title: "Download",
+    eyebrow: "Get Surelin",
+    heading: "Download Surelin",
+    lead: "Windows and Android downloads. Other platforms are coming soon.",
+    render: () => `<section id="download-list" class="download-list"><p>Loading downloads...</p></section>`
+  },
+  search: {
+    title: "Search",
+    eyebrow: "Discover",
+    heading: "Search Surelin",
+    lead: "Find players by username.",
+    render: () => `<section class="feature-card"><form id="search-form" class="admin-form"><label for="search-query">Player username</label><input id="search-query" name="query" minlength="2" maxlength="24" placeholder="Search usernames..." required><button type="submit">Search</button></form><div id="search-results" aria-live="polite"></div></section>`
+  },
+  admin: {
+    title: "Admin Panel",
+    eyebrow: "Staff only",
+    heading: "Admin Panel",
+    lead: "Manage Surelin platform download links.",
+    render: () => `<section id="admin-panel" class="feature-card"><p>Checking staff permissions...</p></section>`
   },
   friends: {
     title: "Friends",

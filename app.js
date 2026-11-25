@@ -1,6 +1,8 @@
 const navigation = [
   ["home", "Home", "index.html", "⌂"],
   ["servers", "Servers", "servers.html", "▤"],
+  ["downloads", "Download", "download.html", "↓"],
+  ["admin", "Admin Panel", "admin.html", "⚙"],
   ["profile", "Profile", "profile.html", "◉"],
   ["friends", "Friends", "friends.html", "♧"],
   ["inventory", "Inventory", "inventory.html", "▦"],
@@ -169,7 +171,7 @@ document.querySelector("#app").innerHTML = `
       <a class="brand" href="index.html">SURE<span>LIN</span></a>
       <div class="nav-caption">PLATFORM</div>
       <nav class="nav" aria-label="Main navigation">
-        ${navigation.map(([id, label, href, icon]) => `<a class="nav-link" href="${href}"${id === pageName ? ' aria-current="page"' : ""}><span class="nav-icon" aria-hidden="true">${icon}</span>${label}</a>`).join("")}
+        ${navigation.map(([id, label, href, icon]) => `<a class="nav-link" ${id === "admin" ? 'id="admin-nav" style="display:none" ' : ""}href="${href}"${id === pageName ? ' aria-current="page"' : ""}><span class="nav-icon" aria-hidden="true">${icon}</span>${label}</a>`).join("")}
       </nav>
       <div class="sidebar-bottom">Local preview<br><a href="https://www.youtube.com/@isaacgoatedofficial">isaacgoated</a></div>
     </aside>
@@ -267,6 +269,73 @@ async function loadServers(client) {
   container.replaceChildren(list);
 }
 
+async function loadDownloadLinks(client, adminMode = false) {
+  const container = document.querySelector(adminMode ? "#admin-download-table" : "#download-list");
+  if (!container) return;
+  const query = client.from("download_links").select("id, platform, label, url, active, created_at").order("created_at", { ascending: false });
+  const { data, error } = await (adminMode ? query : query.eq("active", true));
+  if (error) {
+    container.textContent = "Could not load download links. Run the Surelin SQL setup file in Supabase first.";
+    return;
+  }
+  if (!data || data.length === 0) {
+    container.innerHTML = adminMode ? "<p>No download links yet. Add one above.</p>" : '<div class="empty-state"><h2>No downloads published yet</h2><p>Check back later for official Surelin downloads.</p></div>';
+    return;
+  }
+  if (adminMode) {
+    container.innerHTML = data.map(item => `<div class="admin-download-row"><div><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.platform)} · ${item.active ? "Published" : "Hidden"}</span><a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Open link</a></div><button type="button" class="danger-button" data-delete-download="${escapeHtml(item.id)}">Delete</button></div>`).join("");
+  } else {
+    container.innerHTML = data.map(item => `<article class="download-card"><div><span class="tag">${escapeHtml(item.platform)}</span><h2>${escapeHtml(item.label)}</h2></div><a class="download-button" href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer">Download</a></article>`).join("");
+  }
+}
+
+async function initializeAdminPanel(client, session) {
+  const panel = document.querySelector("#admin-panel");
+  if (!panel) return;
+  if (!session) {
+    panel.innerHTML = '<div class="empty-state"><h2>Log in required</h2><p>Sign in with your Surelin staff account to continue.</p><a href="login.html">Log in</a></div>';
+    return;
+  }
+  const { data: allowed, error: permissionError } = await client.rpc("is_surelin_staff");
+  if (permissionError || allowed !== true) {
+    panel.innerHTML = '<div class="empty-state"><h2>Access denied</h2><p>This account is not listed as an owner or admin in staff_accounts.</p></div>';
+    return;
+  }
+  panel.innerHTML = `<div class="admin-section"><h2>Download links</h2><p>Add or remove official download destinations.</p><form id="create-download-form" class="admin-form"><label for="download-platform">Platform</label><select id="download-platform" name="platform" required><option value="Windows">Windows</option><option value="macOS">macOS</option><option value="Android APK">Android APK</option><option value="iOS IPA">iOS IPA</option><option value="Other">Other</option></select><label for="download-label">Display name</label><input id="download-label" name="label" maxlength="80" placeholder="Surelin for Windows" required><label for="download-url">Download or redirect URL</label><input id="download-url" name="url" type="url" placeholder="https://..." required><button type="submit">Add download link</button><p id="admin-message" role="status"></p></form><div id="admin-download-table" class="admin-download-table">Loading links...</div></div>`;
+  const form = document.querySelector("#create-download-form");
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const message = document.querySelector("#admin-message");
+    const values = new FormData(form);
+    const url = String(values.get("url") || "").trim();
+    if (!url.startsWith("https://")) {
+      message.textContent = "Use a secure https:// link.";
+      return;
+    }
+    const { error } = await client.from("download_links").insert({ platform: values.get("platform"), label: String(values.get("label") || "").trim(), url, active: true });
+    if (error) {
+      message.textContent = error.message;
+      return;
+    }
+    form.reset();
+    message.textContent = "Download link added.";
+    await loadDownloadLinks(client, true);
+  });
+  document.querySelector("#admin-download-table").addEventListener("click", async event => {
+    const button = event.target.closest("[data-delete-download]");
+    if (!button) return;
+    button.disabled = true;
+    const { error } = await client.from("download_links").delete().eq("id", button.dataset.deleteDownload);
+    if (error) {
+      document.querySelector("#admin-message").textContent = error.message;
+      button.disabled = false;
+      return;
+    }
+    await loadDownloadLinks(client, true);
+  });
+  await loadDownloadLinks(client, true);
+}
+
 async function initializeSupabase() {
   try {
     const client = await getSupabaseClient();
@@ -291,6 +360,8 @@ async function initializeSupabase() {
       indicator.textContent = "Not signed in";
     }
     if (pageName === "servers") await loadServers(client);
+    if (pageName === "downloads") await loadDownloadLinks(client);
+    if (pageName === "admin") await initializeAdminPanel(client, data.session);
   } catch (error) {
     const container = document.querySelector("#servers-list");
     if (container) container.textContent = `Could not connect to Supabase: ${error.message}`;

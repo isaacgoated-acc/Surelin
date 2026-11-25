@@ -4,6 +4,7 @@ alter table public.profiles add column if not exists selected_character_id integ
 alter table public.profiles add column if not exists display_name text;
 alter table public.profiles add column if not exists bio text not null default '';
 alter table public.profiles add column if not exists avatar_url text;
+do $ declare c record; begin for c in select conname from pg_constraint where conrelid = 'public.profiles'::regclass and contype = 'f' and confrelid = 'public.surelin_credentials'::regclass loop execute format('alter table public.profiles drop constraint %I', c.conname); end loop; end; $;
 alter table public.profiles drop constraint if exists profiles_id_fkey;
 alter table public.profiles enable row level security;
 
@@ -86,7 +87,7 @@ begin
 end;
 $$;
 
-create or replace function public.admin_grant_asset(target_username text, asset_type text, asset_id text)
+create or replace function public.admin_grant_asset(target_username text, p_asset_type text, p_asset_id text)
 returns void
 language plpgsql
 security definer
@@ -98,18 +99,18 @@ declare
 begin
   if not public.is_surelin_staff() then raise exception 'Staff permission required'; end if;
   select lower(username) into actor_name from public.profiles where id = auth.uid();
-  if asset_type not in ('character', 'item', 'cosmetic') then raise exception 'Invalid asset type'; end if;
-  if asset_type = 'character' and asset_id = '1' and actor_name not in ('isaacgoated', 'rawbt') then
+  if p_asset_type not in ('character', 'item', 'cosmetic') then raise exception 'Invalid asset type'; end if;
+  if p_asset_type = 'character' and p_asset_id = '1' and actor_name not in ('isaacgoated', 'rawbt') then
     raise exception 'Only isaacgoated and rawbt can grant the Rawbt character';
   end if;
-  if asset_type = 'character' and not exists (select 1 from public.characters where id::text = asset_id) then raise exception 'Character does not exist'; end if;
-  if asset_type in ('item', 'cosmetic') and not exists (select 1 from public.catalog_assets where catalog_assets.asset_type = admin_grant_asset.asset_type and catalog_assets.asset_id = admin_grant_asset.asset_id) then
-    insert into public.catalog_assets(asset_type, asset_id, name) values (asset_type, asset_id, asset_type || ' ' || asset_id) on conflict do nothing;
+  if p_asset_type = 'character' and not exists (select 1 from public.characters where id::text = p_asset_id) then raise exception 'Character does not exist'; end if;
+  if p_asset_type in ('item', 'cosmetic') and not exists (select 1 from public.catalog_assets where catalog_assets.asset_type = p_asset_type and catalog_assets.asset_id = p_asset_id) then
+    insert into public.catalog_assets(asset_type, asset_id, name) values (p_asset_type, p_asset_id, p_asset_type || ' ' || p_asset_id) on conflict do nothing;
   end if;
   select id into target_id from public.profiles where lower(username) = lower(trim(target_username)) limit 1;
   if target_id is null then raise exception 'Player not found'; end if;
   insert into public.player_inventory(player_id, asset_type, asset_id, granted_by)
-  values (target_id, asset_type, asset_id, auth.uid())
+  values (target_id, p_asset_type, p_asset_id, auth.uid())
   on conflict (player_id, asset_type, asset_id) do nothing;
 end;
 $$;
@@ -118,3 +119,5 @@ revoke all on function public.admin_adjust_sura(text, bigint, text) from public;
 revoke all on function public.admin_grant_asset(text, text, text) from public;
 grant execute on function public.admin_adjust_sura(text, bigint, text) to authenticated;
 grant execute on function public.admin_grant_asset(text, text, text) to authenticated;
+
+insert into public.staff_accounts(account_id, level) select id, case when lower(username) = 'isaacgoated' then 'owner' else 'admin' end from public.profiles where lower(username) in ('isaacgoated', 'rawbt') on conflict (account_id) do nothing;

@@ -450,7 +450,7 @@ async function loadProfile(client, session) {
 async function renderCharacter(client, userId, selectedId) {
   const target = document.querySelector("#character-renderer");
   if (!target) return;
-  const { data: character } = await client.from("characters").select("id, name, color").eq("id", selectedId || 0).maybeSingle();
+  const { data: character } = await client.from("characters").select("id, name, color, model_url").eq("id", selectedId || 0).maybeSingle();
   const label = character?.name || "Default Character";
   target.innerHTML = `<div class="character-stage"><canvas id="character-canvas"></canvas><span>${escapeHtml(label)}</span></div>`;
   try {

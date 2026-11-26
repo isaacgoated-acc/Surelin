@@ -312,7 +312,7 @@ async function initializeAdminPanel(client, session) {
     panel.innerHTML = '<div class="empty-state"><h2>Access denied</h2><p>This account is not listed as an owner or admin in staff_accounts.</p></div>';
     return;
   }
-  panel.innerHTML = `<div class="admin-section"><h2>Manage player Sura</h2><form id="sura-admin-form" class="admin-form"><label>Player username</label><input name="username" required><label>Amount</label><input name="amount" type="number" min="0" step="1" required><label>Action</label><select name="adjustment"><option value="give">Give Sura</option><option value="set">Set Sura</option></select><button type="submit">Apply Sura change</button><p id="sura-admin-message" role="status"></p></form><h2>Give characters, items, and cosmetics</h2><form id="asset-admin-form" class="admin-form"><label>Player username</label><input name="username" required><label>Asset type</label><select name="asset_type"><option value="character">Character</option><option value="item">Item</option><option value="cosmetic">Cosmetic</option></select><label>Asset ID</label><input name="asset_id" required><button type="submit">Grant asset</button><p id="asset-admin-message" role="status"></p><p class="notice">Character ID 1 (Rawbt) can only be granted by the isaacgoated or rawbt accounts.</p></form><div class="admin-section"><h2>Download links</h2><p>Add or remove official download destinations.</p><form id="create-download-form" class="admin-form"><label for="download-platform">Platform</label><select id="download-platform" name="platform" required><option value="Windows">Windows</option><option value="macOS">macOS</option><option value="Android APK">Android APK</option><option value="iOS IPA">iOS IPA</option><option value="Other">Other</option></select><label for="download-label">Display name</label><input id="download-label" name="label" maxlength="80" placeholder="Surelin for Windows" required><label for="download-url">Download or redirect URL</label><input id="download-url" name="url" type="url" placeholder="https://..." required><button type="submit">Add download link</button><p id="admin-message" role="status"></p></form><div id="admin-download-table" class="admin-download-table">Loading links...</div></div>`;
+  panel.innerHTML = `<div class="admin-section"><h2>Manage player Sura</h2><form id="sura-admin-form" class="admin-form"><label>Player username</label><input name="username" required><label>Amount</label><input name="amount" type="number" min="0" step="1" required><label>Action</label><select name="adjustment"><option value="give">Give Sura</option><option value="set">Set Sura</option></select><button type="submit">Apply Sura change</button><p id="sura-admin-message" role="status"></p></form><h2>Give characters, items, and cosmetics</h2><form id="asset-admin-form" class="admin-form"><label>Player username</label><input name="username" required><label>Asset type</label><select name="asset_type"><option value="character">Character</option><option value="item">Item</option><option value="cosmetic">Cosmetic</option></select><label>Asset ID</label><input name="asset_id" required><button type="submit">Grant asset</button><p id="asset-admin-message" role="status"></p><p class="notice">Character ID 1 (Rawbt) can only be granted by the isaacgoated or rawbt accounts.</p></form><div class="admin-section"><h2>Publish announcement</h2><p>Only isaacgoated and rawbt can publish or remove announcements.</p><form id="announcement-form" class="admin-form"><label for="announcement-title">Title</label><input id="announcement-title" name="title" maxlength="100" required><label for="announcement-body">Message</label><textarea id="announcement-body" name="body" maxlength="3000" required></textarea><button type="submit">Publish announcement</button><p id="announcement-message" role="status"></p></form><div id="admin-announcements-list"></div></div><div class="admin-section"><h2>Download links</h2><p>Add or remove official download destinations.</p><form id="create-download-form" class="admin-form"><label for="download-platform">Platform</label><select id="download-platform" name="platform" required><option value="Windows">Windows</option><option value="macOS">macOS</option><option value="Android APK">Android APK</option><option value="iOS IPA">iOS IPA</option><option value="Other">Other</option></select><label for="download-label">Display name</label><input id="download-label" name="label" maxlength="80" placeholder="Surelin for Windows" required><label for="download-url">Download or redirect URL</label><input id="download-url" name="url" type="url" placeholder="https://..." required><button type="submit">Add download link</button><p id="admin-message" role="status"></p></form><div id="admin-download-table" class="admin-download-table">Loading links...</div></div>`;
   document.querySelector("#sura-admin-form").addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -326,6 +326,28 @@ async function initializeAdminPanel(client, session) {
     const { error } = await client.rpc("admin_grant_asset", { target_username: String(values.get("username")).trim(), p_asset_type: values.get("asset_type"), p_asset_id: String(values.get("asset_id")).trim() });
     document.querySelector("#asset-admin-message").textContent = error ? error.message : "Asset granted!";
   });
+  const announcementForm = document.querySelector("#announcement-form");
+  announcementForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const values = new FormData(announcementForm);
+    const { error } = await client.rpc("surelin_publish_announcement", {
+      p_title: String(values.get("title")).trim(),
+      p_body: String(values.get("body")).trim()
+    });
+    document.querySelector("#announcement-message").textContent = error ? error.message : "Announcement published!";
+    if (!error) {
+      announcementForm.reset();
+      await loadAnnouncements(client, "#admin-announcements-list", true);
+    }
+  });
+  document.querySelector("#admin-announcements-list").addEventListener("click", async event => {
+    const button = event.target.closest("[data-delete-announcement]");
+    if (!button) return;
+    const { error } = await client.rpc("surelin_delete_announcement", { p_id: Number(button.dataset.deleteAnnouncement) });
+    document.querySelector("#announcement-message").textContent = error ? error.message : "Announcement removed.";
+    if (!error) await loadAnnouncements(client, "#admin-announcements-list", true);
+  });
+  await loadAnnouncements(client, "#admin-announcements-list", true);
   const form = document.querySelector("#create-download-form");
   form.addEventListener("submit", async event => {
     event.preventDefault();
@@ -472,6 +494,22 @@ async function loadInventory(client, session) {
   });
 }
 
+
+async function loadAnnouncements(client, selector = "#announcements-list", adminMode = false) {
+  const target = document.querySelector(selector);
+  if (!target) return;
+  const { data, error } = await client.from("announcements").select("id,title,body,created_at").eq("published", true).order("created_at", { ascending: false }).limit(20);
+  if (error) {
+    target.textContent = "Announcements are not available yet. Run supabase/announcements.sql.";
+    return;
+  }
+  if (!data?.length) {
+    target.innerHTML = "<p>No announcements yet.</p>";
+    return;
+  }
+  target.innerHTML = data.map(item => `<article class="announcement-card"><div class="section-heading"><h3>${escapeHtml(item.title)}</h3><time>${new Date(item.created_at).toLocaleString()}</time></div><p>${escapeHtml(item.body).replace(/\\n/g, "<br>")}</p>${adminMode ? `<button type="button" data-delete-announcement="${item.id}">Delete</button>` : ""}</article>`).join("");
+}
+
 async function initializeSupabase() {
   try {
     const client = await getSupabaseClient();
@@ -503,6 +541,7 @@ async function initializeSupabase() {
       indicator.textContent = "Not signed in";
     }
     if (pageName === "servers") await loadServers(client);
+    if (pageName === "home") await loadAnnouncements(client);
     if (pageName === "downloads") await loadDownloadLinks(client);
     if (pageName === "profile") await loadProfile(client, data.session);
     if (pageName === "inventory") { await loadInventory(client, data.session); if (data.session) { const { data: ownProfile } = await client.from("profiles").select("selected_character_id").eq("id", data.session.user.id).maybeSingle(); await renderCharacter(client, data.session.user.id, ownProfile?.selected_character_id); } }

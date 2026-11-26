@@ -149,19 +149,17 @@ const pages = {
 function accountForm(isSignup) {
   return `<section class="feature-card account-card">
     <form id="account-form" data-action="${isSignup ? "signup" : "login"}">
-      ${isSignup ? `<label for="username">Username</label><input id="username" name="username" type="text" minlength="3" maxlength="24" autocomplete="username" required>` : ""}
-      <label for="email">Email</label>
-      <input id="email" name="email" type="email" autocomplete="email" required>
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" minlength="3" maxlength="24" pattern="[A-Za-z0-9_]+" autocomplete="username" required>
       <label for="password">Password</label>
       <input id="password" name="password" type="password" minlength="8" autocomplete="${isSignup ? "new-password" : "current-password"}" required>
       <button type="submit">${isSignup ? "Create Account" : "Log In"}</button>
       <p id="account-message" role="status" aria-live="polite"></p>
     </form>
     <p class="form-switch">${isSignup ? `Already have an account? <a href="login.html">Log in</a>.` : `New to Surelin? <a href="signup.html">Create an account</a>.`}</p>
-    <div class="notice">Authentication is handled by Supabase over HTTPS. Passwords are never stored by this website.</div>
+    <div class="notice">Sign in with your username and password. Supabase securely hashes and stores passwords.</div>
   </section>`;
 }
-
 function badgeCards(items) {
   return `<section class="card-grid" aria-label="Achievement badges">${items.map(([name, description, image, category]) => `
     <article class="card">
@@ -211,23 +209,19 @@ document.querySelector("#account-form")?.addEventListener("submit", async event 
   try {
     const client = await getSupabaseClient();
     const formData = new FormData(form);
-    const email = String(formData.get("email") || "").trim();
+    const username = String(formData.get("username") || "").trim();
     const password = String(formData.get("password") || "");
+    if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) throw new Error("Use 3–24 letters, numbers, or underscores for your username.");
+    const email = `${username.toLowerCase()}@users.surelin.local`;
     let result;
     if (form.dataset.action === "signup") {
-      const username = String(formData.get("username") || "").trim();
-      result = await client.auth.signUp({
-        email,
-        password,
-        options: { data: { username, display_name: username } }
-      });
+      result = await client.auth.signUp({ email, password, options: { data: { username, display_name: username } } });
     } else {
       result = await client.auth.signInWithPassword({ email, password });
     }
-
     if (result.error) throw result.error;
     if (form.dataset.action === "signup" && !result.data.session) {
-      message.textContent = "Account created. Check your email to confirm it, then log in.";
+      message.textContent = "Account created, but email confirmation is enabled. Ask the administrator to disable Confirm email in Supabase Auth settings.";
       return;
     }
     window.location.href = "index.html";

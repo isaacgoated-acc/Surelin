@@ -167,7 +167,7 @@ function accountForm(isSignup) {
 function badgeCards(items) {
   return `<section class="card-grid" aria-label="Achievement badges">${items.map(([name, description, image, category]) => `
     <article class="card">
-      <div class="badge-art"><img src="assets/badges/${encodeURIComponent(image)}" alt="${escapeHtml(name)} achievement badge"></div>
+      <div class="badge-art"><img src="badges/${encodeURIComponent(image)}" alt="${escapeHtml(name)} achievement badge"></div>
       <div class="card-body"><h2>${escapeHtml(name)}</h2><p>${escapeHtml(description)}</p><span class="tag">${escapeHtml(category)}</span></div>
     </article>`).join("")}</section>`;
 }
@@ -469,6 +469,10 @@ async function renderCharacter(client, userId, selectedId) {
     const light = new THREE.DirectionalLight(0xffffff, 2);
     light.position.set(3, 5, 4);
     scene.add(light);
+    if (character?.model_url) {
+      const { GLTFLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js");
+      new GLTFLoader().load(new URL(character.model_url, location.href).href, gltf => { gltf.scene.position.y = 0; scene.add(gltf.scene); renderer.render(scene, camera); }, undefined, () => { target.insertAdjacentHTML("beforeend", '<p class="notice">Could not load this character model.</p>'); });
+    }
     const material = new THREE.MeshStandardMaterial({ color: character?.color || "#8db4d8", roughness: 0.65 });
     const skin = new THREE.MeshStandardMaterial({ color: "#e5c2a2" });
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.65, 4, 8), material);
@@ -549,7 +553,7 @@ async function loadChat(client, session) {
   let selected = null;
   let history = [];
   let channel = null;
-  const blockedTerms = ["slur1","slur2","explicit insult"];
+  const blockedTerms = ["fuck","shit","bitch","asshole","damn","crap"];
   const clean = value => {
     let text = String(value || "");
     if (safety.value === "mask") for (const term of blockedTerms) text = text.replace(new RegExp(term, "gi"), "•••");

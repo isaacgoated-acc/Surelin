@@ -613,7 +613,9 @@ async function loadChat(client, session) {
     sendForm.querySelector("button").disabled = false;
     messages.textContent = "Loading conversation...";
     if (channel) await client.removeChannel(channel);
-    const { data, error } = await client.from("direct_messages").select("id,sender_id,recipient_id,body,created_at").or(`and(sender_id.eq.${session.user.id},recipient_id.eq.${player.id}),and(sender_id.eq.${player.id},recipient_id.eq.${session.user.id})`).order("created_at", { ascending: true }).limit(300);
+    const [sent, received] = await Promise.all([client.from("direct_messages").select("id,sender_id,recipient_id,body,created_at").eq("sender_id",session.user.id).eq("recipient_id",player.id).order("created_at",{ascending:true}).limit(300),client.from("direct_messages").select("id,sender_id,recipient_id,body,created_at").eq("sender_id",player.id).eq("recipient_id",session.user.id).order("created_at",{ascending:true}).limit(300)]);
+    const error = sent.error || received.error;
+    const data = [...(sent.data || []),...(received.data || [])].sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
     if (error) { messages.textContent = "Chat setup needed: run supabase/social_chat_shop.sql. " + error.message; return; }
     history = data || [];
     drawMessages();

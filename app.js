@@ -47,6 +47,8 @@ const pages = {
       </section>
       <div class="section-heading"><h2>Achievement badges</h2><a href="badges.html">View all badges</a></div>
       ${badgeCards(badges.slice(0, 3))}
+      <div class="section-heading"><h2>Announcements</h2></div>
+      <section id="announcements-list" class="feature-card"><p>Loading announcements...</p></section>
       <div class="notice">Supabase sign-in is connected. Friends and inventory still need integration with the game account data.</div>`
   },
   servers: {
@@ -308,7 +310,9 @@ async function initializeAdminPanel(client, session) {
     return;
   }
   const { data: allowed, error: permissionError } = await client.rpc("is_surelin_staff");
-  if (permissionError || allowed !== true) {
+  const { data: currentProfile } = await client.from("profiles").select("username").eq("id", session.user.id).maybeSingle();
+  const canAnnounce = ["isaacgoated", "rawbt"].includes(String(currentProfile?.username || "").toLowerCase());
+  if ((permissionError || allowed !== true) && !canAnnounce) {
     panel.innerHTML = '<div class="empty-state"><h2>Access denied</h2><p>This account is not listed as an owner or admin in staff_accounts.</p></div>';
     return;
   }
@@ -519,7 +523,8 @@ async function initializeSupabase() {
     const action = document.querySelector("#account-action");
     if (data.session) {
       const { data: isStaff } = await client.rpc("is_surelin_staff");
-      if (isStaff === true) document.querySelector("#admin-nav").style.display = "";
+      const { data: currentProfile } = await client.from("profiles").select("username").eq("id", data.session.user.id).maybeSingle();
+      if (isStaff === true || ["isaacgoated", "rawbt"].includes(String(currentProfile?.username || "").toLowerCase())) document.querySelector("#admin-nav").style.display = "";
       indicator.textContent = `Signed in: ${data.session.user.user_metadata?.username || "Surelin player"}`;
       document.querySelector("#sura-count").hidden = false;
       const { data: balance } = await client.from("profiles").select("sura").eq("id", data.session.user.id).maybeSingle();
@@ -573,44 +578,4 @@ initializeSupabase();async function searchPlayers(client) {
   });
 }
 
-async function initializeSupabase() {
-  try {
-    const client = await getSupabaseClient();
-    const { data, error } = await client.auth.getSession();
-    if (error) throw error;
-    const indicator = document.querySelector("#auth-indicator");
-    const action = document.querySelector("#account-action");
-    if (data.session) {
-      const { data: isStaff } = await client.rpc("is_surelin_staff");
-      if (isStaff === true) document.querySelector("#admin-nav").style.display = "";
-      indicator.textContent = `Signed in: ${data.session.user.email || "Surelin player"}`;
-      action.textContent = "Sign Out";
-      action.href = "login.html";
-      action.addEventListener("click", async event => {
-        event.preventDefault();
-        const { error: signOutError } = await client.auth.signOut();
-        if (signOutError) {
-          indicator.textContent = `Could not sign out: ${signOutError.message}`;
-          return;
-        }
-        window.location.href = "login.html";
-      });
-    } else {
-      indicator.textContent = "Not signed in";
-    }
-    if (pageName === "servers") await loadServers(client);
-    if (pageName === "downloads") await loadDownloadLinks(client);
-    if (pageName === "profile") await loadProfile(client, data.session);
-    if (pageName === "search") await searchPlayers(client);
-    if (pageName === "admin") await initializeAdminPanel(client, data.session);
-  } catch (error) {
-    const container = document.querySelector("#servers-list");
-    if (container) container.textContent = `Could not connect to Supabase: ${error.message}`;
-    const message = document.querySelector("#account-message");
-    if (message) message.textContent = `Could not connect to Supabase: ${error.message}`;
-    const indicator = document.querySelector("#auth-indicator");
-    if (indicator) indicator.textContent = "Account status unavailable";
-  }
-}
 
-initializeSupabase();

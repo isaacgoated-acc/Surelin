@@ -22,7 +22,10 @@ declare
   actor_username text;
   new_id bigint;
 begin
-  select lower(username) into actor_username from public.profiles where id = auth.uid();
+  select lower(coalesce(
+    (select username from public.profiles where id = auth.uid()),
+    (select raw_user_meta_data->>'username' from auth.users where id = auth.uid())
+  )) into actor_username;
   if actor_username not in ('isaacgoated', 'rawbt') then
     raise exception 'Only isaacgoated and rawbt can publish announcements';
   end if;
@@ -44,7 +47,10 @@ as $announcement$
 declare
   actor_username text;
 begin
-  select lower(username) into actor_username from public.profiles where id = auth.uid();
+  select lower(coalesce(
+    (select username from public.profiles where id = auth.uid()),
+    (select raw_user_meta_data->>'username' from auth.users where id = auth.uid())
+  )) into actor_username;
   if actor_username not in ('isaacgoated', 'rawbt') then
     raise exception 'Only isaacgoated and rawbt can manage announcements';
   end if;

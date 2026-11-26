@@ -286,3 +286,5 @@ body {
 @media(max-width:760px){.chat-layout{grid-template-columns:1fr}.chat-send-form{flex-wrap:wrap}.chat-send-form input{flex-basis:100%}}
 
 .shop-asset-image{max-width:100%;max-height:115px;object-fit:contain}
+
+.character-3d-frame{display:block;width:min(100%,620px);height:340px;border:1px solid #354451;background:#0d141a}

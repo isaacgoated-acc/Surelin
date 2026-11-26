@@ -6,6 +6,7 @@ const navigation = [
   ["admin", "Admin Panel", "admin.html", "⚙"],
   ["profile", "Profile", "profile.html", "◉"],
   ["friends", "Friends", "friends.html", "♧"],
+  ["chat", "Chat", "chat.html", "✉"],
   ["inventory", "Inventory", "inventory.html", "▦"],
   ["shop", "Shop", "shop.html", "◇"],
   ["badges", "Badges", "badges.html", "✦"],
@@ -20,11 +21,11 @@ const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_jHUW9hEpKyQcz6BSt6hj-Q_O7hhsbBd
 let supabaseClientPromise;
 
 const badges = [
-  ["Friendship", "Get 1 friend!", "Friendship Achievement Badge(1).png", "Social"],
-  ["First Game", "Your first step into making and sharing games.", "First Game Achievement Badge(2).png", "Creator"],
-  ["Owner", "The red crown marks the Surelin owner.", "Red Crown Owner Badge(1).png", "Special"],
-  ["Used to Be Rich", "You once had a lot of Sura...", "Used to Be Rich Achievement Badge(1).png", "Sura"],
-  ["Richest Player", "Have the most Sura!", "Richest Player Achievement Badge(1).png", "Sura"]
+  ["Friendship", "Get 1 friend!", "Friendship Achievement Badge.png", "Social"],
+  ["First Game", "Your first step into making and sharing games.", "First Game Achievement Badge.png", "Creator"],
+  ["Owner", "The red crown marks the Surelin owner.", "Red Crown Owner Badge.png", "Special"],
+  ["Used to Be Rich", "You once had a lot of Sura...", "Used to Be Rich Achievement Badge.png", "Sura"],
+  ["Richest Player", "Have the most Sura!", "Richest Player Achievement Badge.png", "Sura"]
 ];
 
 const pages = {
@@ -64,7 +65,7 @@ const pages = {
     eyebrow: "Player",
     heading: "Profile",
     lead: "Your public player card and achievement showcase.",
-    render: () => `<section id="profile-card" class="feature-card"><p>Loading your profile...</p></section><section id="character-preview" class="feature-card character-preview"><h2>Selected character</h2><div id="character-renderer">Loading character preview...</div></section><section id="profile-edit" class="feature-card profile-edit"><h2>Edit profile</h2><form id="profile-form" class="admin-form"><label for="profile-username">Username</label><input id="profile-username" name="username" maxlength="24" required><label for="profile-bio">Bio</label><textarea id="profile-bio" name="bio" maxlength="180"></textarea><label for="profile-avatar">Avatar image URL</label><input id="profile-avatar" name="avatar_url" type="url" placeholder="https://..."><button type="submit">Save profile</button><p id="profile-message" role="status"></p></form></section><div class="section-heading"><h2>Badge showcase</h2><a href="badges.html">Browse badges</a></div>${badgeCards(badges.slice(0, 3))}`
+    render: () => `<section id="profile-card" class="feature-card"><p>Loading your profile...</p></section><section id="character-preview" class="feature-card character-preview"><h2>Selected character</h2><div id="character-renderer">Loading character preview...</div></section><section id="profile-edit" class="feature-card profile-edit"><h2>Edit profile</h2><form id="profile-form" class="admin-form"><label for="profile-display-name">Display name</label><input id="profile-display-name" name="display_name" maxlength="32" required><label for="profile-username">Username</label><input id="profile-username" name="username" maxlength="24" required><label for="profile-bio">Bio</label><textarea id="profile-bio" name="bio" maxlength="180"></textarea><label for="profile-avatar">Avatar image URL</label><input id="profile-avatar" name="avatar_url" type="url" placeholder="https://..."><button type="submit">Save profile</button><p id="profile-message" role="status"></p></form></section><div class="section-heading"><h2>Badge showcase</h2><a href="badges.html">Browse badges</a></div>${badgeCards(badges.slice(0, 3))}`
   },
   downloads: {
     title: "Download",
@@ -326,7 +327,8 @@ async function initializeAdminPanel(client, session) {
     panel.innerHTML = '<div class="empty-state"><h2>Access denied</h2><p>This account is not listed as an owner or admin in staff_accounts.</p></div>';
     return;
   }
-  panel.innerHTML = `<div class="admin-section"><h2>Manage player Sura</h2><form id="sura-admin-form" class="admin-form"><label>Player username</label><input name="username" required><label>Amount</label><input name="amount" type="number" min="0" step="1" required><label>Action</label><select name="adjustment"><option value="give">Give Sura</option><option value="set">Set Sura</option></select><button type="submit">Apply Sura change</button><p id="sura-admin-message" role="status"></p></form><h2>Give characters, items, and cosmetics</h2><form id="asset-admin-form" class="admin-form"><label>Player username</label><input name="username" required><label>Asset type</label><select name="asset_type"><option value="character">Character</option><option value="item">Item</option><option value="cosmetic">Cosmetic</option></select><label>Asset ID</label><input name="asset_id" required><button type="submit">Grant asset</button><p id="asset-admin-message" role="status"></p><p class="notice">Character ID 1 (Rawbt) can only be granted by the isaacgoated or rawbt accounts.</p></form><div class="admin-section"><h2>Publish announcement</h2><p>Only isaacgoated and rawbt can publish or remove announcements.</p><form id="announcement-form" class="admin-form"><label for="announcement-title">Title</label><input id="announcement-title" name="title" maxlength="100" required><label for="announcement-body">Message</label><textarea id="announcement-body" name="body" maxlength="3000" required></textarea><button type="submit">Publish announcement</button><p id="announcement-message" role="status"></p></form><div id="admin-announcements-list"></div></div><div class="admin-section"><h2>Download links</h2><p>Add or remove official download destinations.</p><form id="create-download-form" class="admin-form"><label for="download-platform">Platform</label><select id="download-platform" name="platform" required><option value="Windows">Windows</option><option value="macOS">macOS</option><option value="Android APK">Android APK</option><option value="iOS IPA">iOS IPA</option><option value="Other">Other</option></select><label for="download-label">Display name</label><input id="download-label" name="label" maxlength="80" placeholder="Surelin for Windows" required><label for="download-url">Download or redirect URL</label><input id="download-url" name="url" type="url" placeholder="https://..." required><button type="submit">Add download link</button><p id="admin-message" role="status"></p></form><div id="admin-download-table" class="admin-download-table">Loading links...</div></div>`;
+  panel.innerHTML = `<div class="admin-section"><h2>Players</h2><form id="admin-player-search" class="admin-form"><label for="admin-player-query">Search player</label><input id="admin-player-query" name="query" placeholder="Search usernames or display names"><button type="submit">Search players</button></form><div id="admin-player-search-results"></div><div id="admin-player-list" class="player-list">Loading players...</div></div><div class="admin-section"><h2>Manage player Sura</h2><form id="sura-admin-form" class="admin-form"><label>Player username</label><input name="username" required><label>Amount</label><input name="amount" type="number" min="0" step="1" required><label>Action</label><select name="adjustment"><option value="give">Give Sura</option><option value="set">Set Sura</option></select><button type="submit">Apply Sura change</button><p id="sura-admin-message" role="status"></p></form><h2>Give characters, items, and cosmetics</h2><form id="asset-admin-form" class="admin-form"><label>Player username</label><input name="username" required><label>Asset type</label><select name="asset_type"><option value="character">Character</option><option value="item">Item</option><option value="cosmetic">Cosmetic</option></select><label>Asset ID</label><input name="asset_id" required><button type="submit">Grant asset</button><p id="asset-admin-message" role="status"></p><p class="notice">Character ID 1 (Rawbt) can only be granted by the isaacgoated or rawbt accounts.</p></form><div class="admin-section"><h2>Publish announcement</h2><p>Only isaacgoated and rawbt can publish or remove announcements.</p><form id="announcement-form" class="admin-form"><label for="announcement-title">Title</label><input id="announcement-title" name="title" maxlength="100" required><label for="announcement-body">Message</label><textarea id="announcement-body" name="body" maxlength="3000" required></textarea><button type="submit">Publish announcement</button><p id="announcement-message" role="status"></p></form><div id="admin-announcements-list"></div></div><div class="admin-section"><h2>Download links</h2><p>Add or remove official download destinations.</p><form id="create-download-form" class="admin-form"><label for="download-platform">Platform</label><select id="download-platform" name="platform" required><option value="Windows">Windows</option><option value="macOS">macOS</option><option value="Android APK">Android APK</option><option value="iOS IPA">iOS IPA</option><option value="Other">Other</option></select><label for="download-label">Display name</label><input id="download-label" name="label" maxlength="80" placeholder="Surelin for Windows" required><label for="download-url">Download or redirect URL</label><input id="download-url" name="url" type="url" placeholder="https://..." required><button type="submit">Add download link</button><p id="admin-message" role="status"></p></form><div id="admin-download-table" class="admin-download-table">Loading links...</div></div>`;
+  await loadAdminPlayers(client);
   document.querySelector("#sura-admin-form").addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget;
@@ -426,6 +428,7 @@ async function loadProfile(client, session) {
   if (!isOwn) return;
   const form = document.querySelector("#profile-form");
   form.elements.username.value = profile.username || "";
+  form.elements.display_name.value = profile.display_name || profile.username || "";
   form.elements.bio.value = profile.bio || "";
   form.elements.avatar_url.value = profile.avatar_url || "";
   form.addEventListener("submit", async event => {
@@ -433,10 +436,12 @@ async function loadProfile(client, session) {
     const message = document.querySelector("#profile-message");
     const values = new FormData(form);
     const username = String(values.get("username") || "").trim();
+    const display_name = String(values.get("display_name") || "").trim();
     const avatar_url = String(values.get("avatar_url") || "").trim();
     if (!/^[A-Za-z0-9_]{3,24}$/.test(username)) { message.textContent = "Username must be 3–24 letters, numbers, or underscores."; return; }
+    if (!display_name || display_name.length > 32) { message.textContent = "Display name must be 1–32 characters."; return; }
     if (avatar_url && !avatar_url.startsWith("https://")) { message.textContent = "Avatar URL must start with https://."; return; }
-    const { error: saveError } = await client.from("profiles").update({ username, display_name: username, bio: String(values.get("bio") || "").trim(), avatar_url: avatar_url || null }).eq("id", userId);
+    const { error: saveError } = await client.from("profiles").update({ username, display_name, bio: String(values.get("bio") || "").trim(), avatar_url: avatar_url || null }).eq("id", userId);
     message.textContent = saveError ? saveError.message : "Profile saved!";
     if (!saveError) await loadProfile(client, session);
   });
@@ -509,6 +514,134 @@ async function loadInventory(client, session) {
 }
 
 
+
+async function loadAdminPlayers(client) {
+  const list = document.querySelector("#admin-player-list");
+  const form = document.querySelector("#admin-player-search");
+  if (!list || !form) return;
+  const render = rows => {
+    list.innerHTML = rows.length ? rows.map(p => `<a class="player-list-row" href="profile.html?user=${encodeURIComponent(p.id)}"><strong>${escapeHtml(p.display_name || p.username)}</strong><span>@${escapeHtml(p.username)}</span><span>${Number(p.sura || 0).toLocaleString()} Sura</span></a>`).join("") : "<p>No players found.</p>";
+  };
+  const { data, error } = await client.from("profiles").select("id,username,display_name,sura").order("created_at", { ascending: false }).limit(100);
+  if (error) { list.textContent = "Could not load player list: " + error.message; return; }
+  render(data || []);
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const query = String(new FormData(form).get("query") || "").trim();
+    const target = document.querySelector("#admin-player-search-results");
+    if (!query) { target.textContent = "Enter a username or display name."; return; }
+    const { data: found, error: searchError } = await client.from("profiles").select("id,username,display_name,sura").or(`username.ilike.%${query}%,display_name.ilike.%${query}%`).limit(25);
+    if (searchError) { target.textContent = searchError.message; return; }
+    target.innerHTML = (found || []).map(p => `<a class="player-list-row" href="profile.html?user=${encodeURIComponent(p.id)}"><strong>${escapeHtml(p.display_name || p.username)}</strong><span>@${escapeHtml(p.username)}</span></a>`).join("") || "<p>No matching players.</p>";
+  });
+}
+
+async function loadChat(client, session) {
+  const messages = document.querySelector("#chat-messages");
+  if (!messages) return;
+  if (!session) { messages.innerHTML = '<div class="empty-state">Log in to use chat.</div>'; return; }
+  const playerList = document.querySelector("#chat-player-list");
+  const playerForm = document.querySelector("#chat-player-form");
+  const sendForm = document.querySelector("#chat-send-form");
+  const filter = document.querySelector("#chat-filter");
+  const safety = document.querySelector("#chat-safety-filter");
+  const status = document.querySelector("#chat-status");
+  let selected = null;
+  let history = [];
+  let channel = null;
+  const blockedTerms = ["slur1","slur2","explicit insult"];
+  const clean = value => {
+    let text = String(value || "");
+    if (safety.value === "mask") for (const term of blockedTerms) text = text.replace(new RegExp(term, "gi"), "•••");
+    return text;
+  };
+  const drawMessages = () => {
+    const query = filter.value.trim().toLowerCase();
+    const shown = history.filter(m => !query || m.body.toLowerCase().includes(query));
+    messages.innerHTML = shown.map(m => `<article class="chat-message ${m.sender_id === session.user.id ? "mine" : ""}"><p>${escapeHtml(clean(m.body))}</p><time>${new Date(m.created_at).toLocaleString()}</time></article>`).join("") || "<p>No messages match this filter.</p>";
+    messages.scrollTop = messages.scrollHeight;
+  };
+  const openConversation = async player => {
+    selected = player;
+    document.querySelector("#chat-heading").innerHTML = `<h2>${escapeHtml(player.display_name || player.username)}</h2><span>@${escapeHtml(player.username)}</span>`;
+    sendForm.elements.body.disabled = false;
+    sendForm.querySelector("button").disabled = false;
+    messages.textContent = "Loading conversation...";
+    if (channel) await client.removeChannel(channel);
+    const { data, error } = await client.from("direct_messages").select("id,sender_id,recipient_id,body,created_at").or(`and(sender_id.eq.${session.user.id},recipient_id.eq.${player.id}),and(sender_id.eq.${player.id},recipient_id.eq.${session.user.id})`).order("created_at", { ascending: true }).limit(300);
+    if (error) { messages.textContent = "Chat setup needed: run supabase/social_chat_shop.sql. " + error.message; return; }
+    history = data || [];
+    drawMessages();
+    channel = client.channel("surelin-chat-" + [session.user.id, player.id].sort().join("-")).on("postgres_changes", { event: "INSERT", schema: "public", table: "direct_messages" }, payload => {
+      const m = payload.new;
+      if ((m.sender_id === session.user.id && m.recipient_id === player.id) || (m.sender_id === player.id && m.recipient_id === session.user.id)) {
+        if (!history.some(x => x.id === m.id)) history.push(m);
+        drawMessages();
+      }
+    }).subscribe();
+  };
+  const { data: players, error } = await client.from("profiles").select("id,username,display_name").neq("id", session.user.id).order("username").limit(100);
+  if (error) { playerList.textContent = error.message; return; }
+  playerList.innerHTML = (players || []).map(p => `<button type="button" class="player-list-row" data-chat-player="${p.id}"><strong>${escapeHtml(p.display_name || p.username)}</strong><span>@${escapeHtml(p.username)}</span></button>`).join("") || "<p>No other players yet.</p>";
+  playerList.addEventListener("click", event => {
+    const button = event.target.closest("[data-chat-player]");
+    const player = players.find(p => p.id === button?.dataset.chatPlayer);
+    if (player) openConversation(player);
+  });
+  playerForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const username = String(new FormData(playerForm).get("username") || "").trim();
+    const player = (players || []).find(p => p.username.toLowerCase() === username.toLowerCase());
+    if (!player) { status.textContent = "Player not found in the loaded player list."; return; }
+    await openConversation(player);
+  });
+  sendForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (!selected) { status.textContent = "Choose a player first."; return; }
+    const body = String(new FormData(sendForm).get("body") || "").trim();
+    if (!body) return;
+    const { data, error: sendError } = await client.from("direct_messages").insert({ sender_id: session.user.id, recipient_id: selected.id, body }).select("id,sender_id,recipient_id,body,created_at").single();
+    if (sendError) { status.textContent = sendError.message; return; }
+    if (!history.some(x => x.id === data.id)) history.push(data);
+    drawMessages();
+    sendForm.reset();
+    status.textContent = "";
+  });
+  filter.addEventListener("input", drawMessages);
+  safety.addEventListener("change", drawMessages);
+  window.addEventListener("beforeunload", () => { if (channel) client.removeChannel(channel); }, { once: true });
+}
+
+async function loadShop(client, session) {
+  const target = document.querySelector("#shop-list");
+  if (!target) return;
+  const [charactersResult, assetsResult] = await Promise.all([
+    client.from("characters").select("id,name,description,color,model_url,price_sura").order("id"),
+    client.from("catalog_assets").select("asset_type,asset_id,name,description,price_sura").order("name")
+  ]);
+  if (charactersResult.error || assetsResult.error) {
+    target.textContent = "Could not load shop items. Run supabase/social_chat_shop.sql and check your catalog tables.";
+    return;
+  }
+  const chars = charactersResult.data || [];
+  const assets = assetsResult.data || [];
+  const all = [...chars.map(c => ({...c, asset_type:"character", asset_id:String(c.id)})), ...assets];
+  target.innerHTML = all.length ? `<div class="shop-grid">${all.map(item => `<article class="shop-item"><div class="shop-preview" data-shop-character="${item.asset_type === "character" ? escapeHtml(item.asset_id) : ""}">${item.asset_type === "character" ? `<div class="shop-character-icon" style="--character-color:${escapeHtml(item.color || "#8db4d8")}"></div>` : '<span class="shop-item-icon">◇</span>'}</div><h2>${escapeHtml(item.name)}</h2><p>${escapeHtml(item.description || "")}</p><span class="tag">${escapeHtml(item.asset_type)}</span><p>${Number(item.price_sura || 0).toLocaleString()} Sura</p><form class="review-form" data-review-type="${escapeHtml(item.asset_type)}" data-review-id="${escapeHtml(item.asset_id)}"><label>Rate this item</label><select name="rating"><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select><textarea name="review" maxlength="600" placeholder="Write a review..."></textarea><button type="submit" ${session ? "" : "disabled"}>Submit review</button></form><div class="review-summary" data-reviews-for="${escapeHtml(item.asset_type)}-${escapeHtml(item.asset_id)}">Loading reviews...</div></article>`).join("")}</div>` : '<div class="empty-state"><h2>Nothing in the shop yet</h2><p>Characters and catalog items will appear here when they are added to Supabase.</p></div>';
+  for (const item of all) {
+    const { data: reviews } = await client.from("asset_reviews").select("rating,review,created_at,player_id").eq("asset_type", item.asset_type).eq("asset_id", String(item.asset_id)).order("created_at", { ascending: false }).limit(20);
+    const box = target.querySelector(`[data-reviews-for="${CSS.escape(item.asset_type + "-" + item.asset_id)}"]`);
+    if (box) box.innerHTML = (reviews || []).map(r => `<p>★ ${r.rating}/5 — ${escapeHtml(r.review || "No written review")}</p>`).join("") || "<p>No reviews yet.</p>";
+  }
+  target.querySelectorAll(".review-form").forEach(form => form.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (!session) return;
+    const values = new FormData(form);
+    const { error } = await client.from("asset_reviews").upsert({ player_id: session.user.id, asset_type: form.dataset.reviewType, asset_id: form.dataset.reviewId, rating: Number(values.get("rating")), review: String(values.get("review") || "").trim() }, { onConflict: "player_id,asset_type,asset_id" });
+    const button = form.querySelector("button");
+    button.textContent = error ? error.message : "Review saved!";
+  }));
+}
+
 async function loadAnnouncements(client, selector = "#announcements-list", adminMode = false) {
   const target = document.querySelector(selector);
   if (!target) return;
@@ -562,6 +695,8 @@ async function initializeSupabase() {
     if (pageName === "profile") await loadProfile(client, data.session);
     if (pageName === "inventory") { await loadInventory(client, data.session); if (data.session) { const { data: ownProfile } = await client.from("profiles").select("selected_character_id").eq("id", data.session.user.id).maybeSingle(); await renderCharacter(client, data.session.user.id, ownProfile?.selected_character_id); } }
     if (pageName === "search") await searchPlayers(client);
+    if (pageName === "chat") await loadChat(client, data.session);
+    if (pageName === "shop") await loadShop(client, data.session);
     if (pageName === "admin") await initializeAdminPanel(client, data.session);
   } catch (error) {
     const container = document.querySelector("#servers-list");

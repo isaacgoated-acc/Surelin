@@ -289,3 +289,5 @@ body {
 .review-form button{min-height:36px;border:1px solid #718da5;background:#2b4051;color:#fff;cursor:pointer}
 .review-summary{margin-top:10px;font-size:.84rem;color:#c1cbd3}
 @media(max-width:760px){.chat-layout{grid-template-columns:1fr}.chat-send-form{flex-wrap:wrap}.chat-send-form input{flex-basis:100%}}
+
+.shop-asset-image{max-width:100%;max-height:115px;object-fit:contain}

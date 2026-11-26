@@ -319,7 +319,8 @@ async function initializeAdminPanel(client, session) {
   }
   const { data: allowed, error: permissionError } = await client.rpc("is_surelin_staff");
   const { data: currentProfile } = await client.from("profiles").select("username").eq("id", session.user.id).maybeSingle();
-  const canAnnounce = ["isaacgoated", "rawbt"].includes(String(currentProfile?.username || "").toLowerCase());
+  const accountUsername = String(currentProfile?.username || session.user.user_metadata?.username || "").trim().toLowerCase();
+  const canAnnounce = ["isaacgoated", "rawbt"].includes(accountUsername);
   if ((permissionError || allowed !== true) && !canAnnounce) {
     panel.innerHTML = '<div class="empty-state"><h2>Access denied</h2><p>This account is not listed as an owner or admin in staff_accounts.</p></div>';
     return;
@@ -532,7 +533,8 @@ async function initializeSupabase() {
     if (data.session) {
       const { data: isStaff } = await client.rpc("is_surelin_staff");
       const { data: currentProfile } = await client.from("profiles").select("username").eq("id", data.session.user.id).maybeSingle();
-      if (isStaff === true || ["isaacgoated", "rawbt"].includes(String(currentProfile?.username || "").toLowerCase())) document.querySelector("#admin-nav").style.display = "";
+      const accountUsername = String(currentProfile?.username || data.session.user.user_metadata?.username || "").trim().toLowerCase();
+      if (isStaff === true || ["isaacgoated", "rawbt"].includes(accountUsername)) document.querySelector("#admin-nav").style.display = "";
       indicator.textContent = `Signed in: ${data.session.user.user_metadata?.username || "Surelin player"}`;
       document.querySelector("#sura-count").hidden = false;
       const { data: balance } = await client.from("profiles").select("sura").eq("id", data.session.user.id).maybeSingle();

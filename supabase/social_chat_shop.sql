@@ -54,3 +54,7 @@ begin
   end if;
 end
 $$;
+
+insert into public.characters (id, name, description, color, price_sura)
+values (2, 'Celine', 'A Surelin character.', '#9bb9d1', 0)
+on conflict (id) do update set name = excluded.name, description = excluded.description;

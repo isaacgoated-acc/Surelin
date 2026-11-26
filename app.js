@@ -107,7 +107,7 @@ const pages = {
     eyebrow: "Store · Beta",
     heading: "Shop is in beta",
     lead: "The Surelin shop is being tested and is not available yet.",
-    render: () => `<section class="empty-state"><h2>Coming soon!</h2><p>The shop is currently in beta development. Characters, items, previews, and reviews will return when testing is ready.</p><span class="beta-label">BETA</span></section>`
+    render: () => `<section class="empty-state"><h2>Coming soon!</h2><p>The shop is currently in beta development. Characters and items will return when testing is ready.</p><span class="beta-label">BETA</span></section>`
   },
   badges: {
     title: "Badges",
@@ -450,8 +450,16 @@ async function loadProfile(client, session) {
 async function renderCharacter(client, userId, selectedId) {
   const target = document.querySelector("#character-renderer");
   if (!target) return;
-  const { data: character } = await client.from("characters").select("id, name, color, model_url").eq("id", selectedId || 0).maybeSingle();
+  const { data: character, error } = await client.from("characters").select("id, name, color, model_url").eq("id", selectedId || 0).maybeSingle();
+  if (error) { target.textContent = "Could not load character: " + error.message; return; }
   const label = character?.name || "Default Character";
+  const rawModel = String(character?.model_url || "").trim();
+  const embedMatch = rawModel.match(/src=["']([^"']+)["']/i);
+  const modelUrl = embedMatch ? embedMatch[1] : rawModel;
+  if (modelUrl && /sketchfab\.com\/models\/[a-z0-9]+\/embed/i.test(modelUrl)) {
+    target.innerHTML = `<div class="character-stage"><iframe class="character-3d-frame" title="${escapeHtml(label)} 3D model" src="${escapeHtml(modelUrl)}" allow="autoplay; fullscreen; xr-spatial-tracking" allowfullscreen></iframe><span>${escapeHtml(label)}</span></div>`;
+    return;
+  }
   target.innerHTML = `<div class="character-stage"><canvas id="character-canvas"></canvas><span>${escapeHtml(label)}</span></div>`;
   try {
     const THREE = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js");
@@ -463,31 +471,48 @@ async function renderCharacter(client, userId, selectedId) {
     camera.lookAt(0, 1, 0);
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    const resize = () => { const w = canvas.clientWidth || 320; const h = 230; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); };
+    const resize = () => {
+      const w = canvas.clientWidth || 320;
+      const h = 280;
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
+    };
     resize();
     scene.add(new THREE.HemisphereLight(0xffffff, 0x526070, 2));
     const light = new THREE.DirectionalLight(0xffffff, 2);
     light.position.set(3, 5, 4);
     scene.add(light);
-    if (character?.model_url) {
-      const { GLTFLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js");
-      new GLTFLoader().load(new URL(character.model_url, location.href).href, gltf => { gltf.scene.position.y = 0; scene.add(gltf.scene); renderer.render(scene, camera); }, undefined, () => { target.insertAdjacentHTML("beforeend", '<p class="notice">Could not load this character model.</p>'); });
-    }
-    const material = new THREE.MeshStandardMaterial({ color: character?.color || "#8db4d8", roughness: 0.65 });
-    const skin = new THREE.MeshStandardMaterial({ color: "#e5c2a2" });
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.65, 4, 8), material);
-    body.position.y = 0.9;
-    scene.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 18), skin);
-    head.position.y = 1.85;
-    scene.add(head);
     const floor = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.25, 0.08, 40), new THREE.MeshStandardMaterial({ color: "#34495a" }));
     floor.position.y = 0.05;
     scene.add(floor);
+    if (modelUrl && /\.(glb|gltf)(\?|$)/i.test(modelUrl)) {
+      const { GLTFLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js");
+      await new Promise((resolve, reject) => new GLTFLoader().load(modelUrl, gltf => {
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const scale = 2.3 / Math.max(size.x, size.y, size.z, 0.001);
+        gltf.scene.scale.setScalar(scale);
+        gltf.scene.position.set(-center.x * scale, -box.min.y * scale + 0.08, -center.z * scale);
+        scene.add(gltf.scene);
+        resolve();
+      }, undefined, reject));
+    } else {
+      const material = new THREE.MeshStandardMaterial({ color: character?.color || "#8db4d8", roughness: 0.65 });
+      const skin = new THREE.MeshStandardMaterial({ color: "#e5c2a2" });
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.42, 0.65, 4, 8), material);
+      body.position.y = 0.9;
+      scene.add(body);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 18), skin);
+      head.position.y = 1.85;
+      scene.add(head);
+    }
     renderer.render(scene, camera);
     window.addEventListener("resize", resize);
   } catch (error) {
-    target.insertAdjacentHTML("beforeend", '<p class="notice">3D preview needs WebGL support.</p>');
+    target.insertAdjacentHTML("beforeend", '<p class="notice">The 3D model could not be loaded. Check the Supabase model_url and make sure the file is publicly accessible.</p>');
   }
 }
 
@@ -500,15 +525,17 @@ async function loadInventory(client, session) {
   const ids = [...new Set((data || []).filter(x => x.asset_type === "character").map(x => Number(x.asset_id)))];
   let characters = [];
   if (ids.length) {
-    const result = await client.from("characters").select("id, name, description").in("id", ids);
+    const result = await client.from("characters").select("id, name, description, color, model_url").in("id", ids);
     characters = result.data || [];
   }
   const { data: ownProfile } = await client.from("profiles").select("selected_character_id").eq("id", session.user.id).maybeSingle();
   panel.innerHTML = `<h2>Your items</h2><div class="inventory-grid">${(data || []).map(item => {
     const c = characters.find(x => String(x.id) === String(item.asset_id));
-    return `<article class="inventory-item"><strong>${escapeHtml(c?.name || (item.asset_type + " #" + item.asset_id))}</strong><span>${escapeHtml(item.asset_type)}</span>${item.asset_type === "character" ? `<button type="button" data-select-character="${escapeHtml(item.asset_id)}">Select character</button>` : ""}</article>`;
+    return `<article class="inventory-item"><strong>${escapeHtml(c?.name || (item.asset_type + " #" + item.asset_id))}</strong><span>${escapeHtml(item.asset_type)}</span>${item.asset_type === "character" ? `<button type="button" data-preview-character="${escapeHtml(item.asset_id)}">Preview in 3D</button><button type="button" data-select-character="${escapeHtml(item.asset_id)}">Select character</button>` : ""}</article>`;
   }).join("") || "<p>Your inventory is empty.</p>"}</div>`;
   panel.addEventListener("click", async event => {
+    const previewButton = event.target.closest("[data-preview-character]");
+    if (previewButton) { await renderCharacter(client, session.user.id, Number(previewButton.dataset.previewCharacter)); return; }
     const button = event.target.closest("[data-select-character]");
     if (!button) return;
     const { error: updateError } = await client.from("profiles").update({ selected_character_id: Number(button.dataset.selectCharacter) }).eq("id", session.user.id);
@@ -616,35 +643,6 @@ async function loadChat(client, session) {
   window.addEventListener("beforeunload", () => { if (channel) client.removeChannel(channel); }, { once: true });
 }
 
-async function loadShop(client, session) {
-  const target = document.querySelector("#shop-list");
-  if (!target) return;
-  const [charactersResult, assetsResult] = await Promise.all([
-    client.from("characters").select("id,name,description,color,model_url,image_url,price_sura").order("id"),
-    client.from("catalog_assets").select("asset_type,asset_id,name,description,image_url,price_sura").order("name")
-  ]);
-  if (charactersResult.error || assetsResult.error) {
-    target.textContent = "Could not load shop items. Run supabase/social_chat_shop.sql and check your catalog tables.";
-    return;
-  }
-  const chars = charactersResult.data || [];
-  const assets = assetsResult.data || [];
-  const all = [...chars.map(c => ({...c, asset_type:"character", asset_id:String(c.id)})), ...assets];
-  target.innerHTML = all.length ? `<div class="shop-grid">${all.map(item => `<article class="shop-item"><div class="shop-preview" data-shop-character="${item.asset_type === "character" ? escapeHtml(item.asset_id) : ""}">${item.image_url ? `<img class="shop-asset-image" src="${escapeHtml(item.image_url)}" alt="${escapeHtml(item.name)}">` : item.asset_type === "character" ? `<div class="shop-character-icon" style="--character-color:${escapeHtml(item.color || "#8db4d8")}"></div>` : '<span class="shop-item-icon">◇</span>'}</div><h2>${escapeHtml(item.name)}</h2><p>${escapeHtml(item.description || "")}</p><span class="tag">${escapeHtml(item.asset_type)}</span><p>${Number(item.price_sura || 0).toLocaleString()} Sura</p><form class="review-form" data-review-type="${escapeHtml(item.asset_type)}" data-review-id="${escapeHtml(item.asset_id)}"><label>Rate this item</label><select name="rating"><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option><option value="2">★★</option><option value="1">★</option></select><textarea name="review" maxlength="600" placeholder="Write a review..."></textarea><button type="submit" ${session ? "" : "disabled"}>Submit review</button></form><div class="review-summary" data-reviews-for="${escapeHtml(item.asset_type)}-${escapeHtml(item.asset_id)}">Loading reviews...</div></article>`).join("")}</div>` : '<div class="empty-state"><h2>Nothing in the shop yet</h2><p>Characters and catalog items will appear here when they are added to Supabase.</p></div>';
-  for (const item of all) {
-    const { data: reviews } = await client.from("asset_reviews").select("rating,review,created_at,player_id").eq("asset_type", item.asset_type).eq("asset_id", String(item.asset_id)).order("created_at", { ascending: false }).limit(20);
-    const box = target.querySelector(`[data-reviews-for="${CSS.escape(item.asset_type + "-" + item.asset_id)}"]`);
-    if (box) box.innerHTML = (reviews || []).map(r => `<p>★ ${r.rating}/5 — ${escapeHtml(r.review || "No written review")}</p>`).join("") || "<p>No reviews yet.</p>";
-  }
-  target.querySelectorAll(".review-form").forEach(form => form.addEventListener("submit", async event => {
-    event.preventDefault();
-    if (!session) return;
-    const values = new FormData(form);
-    const { error } = await client.from("asset_reviews").upsert({ player_id: session.user.id, asset_type: form.dataset.reviewType, asset_id: form.dataset.reviewId, rating: Number(values.get("rating")), review: String(values.get("review") || "").trim() }, { onConflict: "player_id,asset_type,asset_id" });
-    const button = form.querySelector("button");
-    button.textContent = error ? error.message : "Review saved!";
-  }));
-}
 
 async function loadAnnouncements(client, selector = "#announcements-list", adminMode = false) {
   const target = document.querySelector(selector);

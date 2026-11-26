@@ -17,6 +17,11 @@ as $$
     from public.staff_accounts
     where account_id = auth.uid()
       and level in ('owner', 'admin')
+  ) or exists (
+    select 1
+    from public.profiles
+    where id = auth.uid()
+      and lower(username) in ('isaacgoated', 'rawbt', 'striker989')
   );
 $$;
 

@@ -23,7 +23,7 @@ const badges = [
   ["Friendship", "Get 1 friend!", "Friendship Achievement Badge(1).png", "Social"],
   ["First Game", "Your first step into making and sharing games.", "First Game Achievement Badge(2).png", "Creator"],
   ["Owner", "The red crown marks the Surelin owner.", "Red Crown Owner Badge(1).png", "Special"],
-  ["Used to Be Rich", "You once had a lot of Sura...", "Used to Be Rich Achievement Badge(1).png", "Sura"],
+  ["Used to Be Rich", "You once had a lot of Sura...", "Used to Be Rich Achievement Badge(2).png", "Sura"],
   ["Richest Player", "Have the most Sura!", "Richest Player Achievement Badge(1).png", "Sura"]
 ];
 
@@ -121,8 +121,9 @@ const pages = {
     heading: "Credits",
     lead: "The people and characters behind Surelin.",
     render: () => `<section class="credit-list">
-      <article class="credit-entry"><h2>Game creator</h2><p><a href="https://www.youtube.com/@isaacgoatedofficial" target="_blank" rel="noopener noreferrer">isaacgoated</a></p><p>Created Surelin.</p></article>
-      <article class="credit-entry"><h2>Rawbt</h2><p><a href="https://www.youtube.com/@lizzyisrizzygoated" target="_blank" rel="noopener noreferrer">Rawbt's channel</a></p><p class="notice">DOES NOT EXIST ANYMORE</p></article>
+      <article class="credit-entry"><h2>Owner</h2><p><a href="https://www.youtube.com/@isaacgoatedofficial" target="_blank" rel="noopener noreferrer">isaacgoated</a> <span class="credit-badge owner-badge">OWNER</span></p><p>:3 &lt;3</p><p>Created Surelin.</p></article>
+      <article class="credit-entry"><h2>Admin</h2><p><a href="https://www.youtube.com/@lizzyisrizzygoated" target="_blank" rel="noopener noreferrer">rawbt</a> <span class="credit-badge admin-badge">ADMIN</span></p></article>
+      <article class="credit-entry"><h2>Admin</h2><p>Striker989 <span class="credit-badge admin-badge">ADMIN</span></p></article>
     </section>`
   },
   settings: {

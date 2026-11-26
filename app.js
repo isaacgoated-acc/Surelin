@@ -217,13 +217,21 @@ document.querySelector("#account-form")?.addEventListener("submit", async event 
     const email = `${username.toLowerCase()}@users.surelin.local`;
     let result;
     if (form.dataset.action === "signup") {
+      const { data: existing, error: lookupError } = await client.from("profiles").select("id").ilike("username", username).limit(1);
+      if (lookupError) throw new Error("Could not check username availability: " + lookupError.message);
+      if (existing?.length) throw new Error("That username is already taken. Choose another one.");
       result = await client.auth.signUp({ email, password, options: { data: { username, display_name: username } } });
     } else {
       result = await client.auth.signInWithPassword({ email, password });
     }
-    if (result.error) throw result.error;
+    if (result.error) {
+      const authMessage = String(result.error.message || "");
+      if (/signups? not allowed|email signups are disabled|provider is disabled/i.test(authMessage)) throw new Error("Supabase has the Email provider turned off. Keep Email enabled under Authentication → Sign In / Providers. Players still only enter a username and password on Surelin.");
+      if (/invalid login credentials/i.test(authMessage)) throw new Error("Username or password is incorrect. Use the exact username used when the account was created.");
+      throw result.error;
+    }
     if (form.dataset.action === "signup" && !result.data.session) {
-      message.textContent = "Account created, but email confirmation is enabled. Ask the administrator to disable Confirm email in Supabase Auth settings.";
+      message.textContent = "Account created, but Supabase still requires email confirmation. Turn OFF Confirm email under Authentication → Sign In / Providers → Email. Do not turn OFF the Email provider itself.";
       return;
     }
     window.location.href = "index.html";

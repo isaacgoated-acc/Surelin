@@ -38,8 +38,10 @@ create policy "Players can delete own reviews" on public.asset_reviews for delet
 grant select, insert, update, delete on public.asset_reviews to authenticated;
 
 alter table public.characters add column if not exists model_url text;
+alter table public.characters add column if not exists image_url text;
 alter table public.characters add column if not exists price_sura bigint not null default 0 check (price_sura >= 0);
 alter table public.catalog_assets add column if not exists price_sura bigint not null default 0 check (price_sura >= 0);
+alter table public.catalog_assets add column if not exists image_url text;
 
 do $$
 begin

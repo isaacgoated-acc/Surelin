@@ -103,11 +103,11 @@ const pages = {
     render: () => `<section id="inventory-list" class="feature-card"><p>Loading your collection...</p></section><section id="character-preview" class="feature-card character-preview"><h2>Character preview</h2><div id="character-renderer">Loading character preview...</div></section>`
   },
   shop: {
-    title: "Shop",
-    eyebrow: "Store",
-    heading: "Shop",
-    lead: "Explore cosmetics and creator items for Surelin.",
-    render: () => `<div class="empty-state"><h2>Shop connection pending</h2><p>Purchases and Sura balances must be connected to the secured game backend before buying can be enabled.</p></div>`
+    title: "Shop (Beta)",
+    eyebrow: "Store · Beta",
+    heading: "Shop is in beta",
+    lead: "The Surelin shop is being tested and is not available yet.",
+    render: () => `<section class="empty-state"><h2>Coming soon!</h2><p>The shop is currently in beta development. Characters, items, previews, and reviews will return when testing is ready.</p><span class="beta-label">BETA</span></section>`
   },
   badges: {
     title: "Badges",

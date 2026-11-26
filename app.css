@@ -223,6 +223,7 @@ body {
 .admin-form { display: grid; max-width: 620px; gap: 10px; margin: 20px 0 28px; }
 .admin-form label { margin-top: 5px; color: #d7dfe6; font-size: .9rem; }
 .admin-form input, .admin-form select { min-height: 42px; padding: 8px 10px; border: 1px solid #536474; border-radius: 3px; background: #0e171e; color: #fff; font: inherit; }
+.admin-form textarea { min-height: 120px; padding: 10px; border: 1px solid #536474; border-radius: 3px; background: #0e171e; color: #fff; font: inherit; resize: vertical; }
 .admin-form button { justify-self: start; margin-top: 8px; }
 .admin-download-row > div { display: grid; gap: 6px; min-width: 0; }
 .admin-download-row a { color: #a9c8e3; overflow-wrap: anywhere; font-size: .85rem; }

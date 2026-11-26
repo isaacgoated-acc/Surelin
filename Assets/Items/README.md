@@ -1,0 +1,1 @@
+Place item preview images in this folder. Add each image path to the matching row's image_url field in public.catalog_assets. Use paths relative to the Surelin site, such as Assets/Items/item-name.png.

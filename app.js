@@ -482,7 +482,7 @@ async function initializeSupabase() {
     if (data.session) {
       const { data: isStaff } = await client.rpc("is_surelin_staff");
       if (isStaff === true) document.querySelector("#admin-nav").style.display = "";
-      indicator.textContent = `Signed in: ${data.session.user.email || "Surelin player"}`;
+      indicator.textContent = `Signed in: ${data.session.user.user_metadata?.username || "Surelin player"}`;
       document.querySelector("#sura-count").hidden = false;
       const { data: balance } = await client.from("profiles").select("sura").eq("id", data.session.user.id).maybeSingle();
       document.querySelector("#sura-count").textContent = `${Number(balance?.sura || 0).toLocaleString()} Sura`;

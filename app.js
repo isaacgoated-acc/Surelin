@@ -499,6 +499,18 @@ async function renderCharacter(client, userId, selectedId) {
         scene.add(gltf.scene);
         resolve();
       }, undefined, reject));
+    } else if (modelUrl && /\.fbx(\?|$)/i.test(modelUrl)) {
+      const { FBXLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/FBXLoader.js");
+      await new Promise((resolve, reject) => new FBXLoader().load(modelUrl, object => {
+        const box = new THREE.Box3().setFromObject(object);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const scale = 2.3 / Math.max(size.x, size.y, size.z, 0.001);
+        object.scale.setScalar(scale);
+        object.position.set(-center.x * scale, -box.min.y * scale + 0.08, -center.z * scale);
+        scene.add(object);
+        resolve();
+      }, undefined, reject));
     } else {
       const material = new THREE.MeshStandardMaterial({ color: character?.color || "#8db4d8", roughness: 0.65 });
       const skin = new THREE.MeshStandardMaterial({ color: "#e5c2a2" });
@@ -512,7 +524,9 @@ async function renderCharacter(client, userId, selectedId) {
     renderer.render(scene, camera);
     window.addEventListener("resize", resize);
   } catch (error) {
-    target.insertAdjacentHTML("beforeend", '<p class="notice">The 3D model could not be loaded. Check the Supabase model_url and make sure the file is publicly accessible.</p>');
+    const detail = String(error?.message || error || "");
+    const webgl = /webgl|context|gpu/i.test(detail);
+    target.insertAdjacentHTML("beforeend", `<p class="notice">${webgl ? "Your browser could not start WebGL. In Chrome, enable Use graphics acceleration in Settings → System, relaunch Chrome, and check chrome://gpu." : "The 3D model could not be loaded. Check the Supabase model_url, file permissions, and CORS settings."}</p>`);
   }
 }
 

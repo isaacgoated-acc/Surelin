@@ -23,7 +23,7 @@ const badges = [
   ["Friendship", "Get 1 friend!", "Friendship Achievement Badge(1).png", "Social"],
   ["First Game", "Your first step into making and sharing games.", "First Game Achievement Badge(2).png", "Creator"],
   ["Owner", "The red crown marks the Surelin owner.", "Red Crown Owner Badge(1).png", "Special"],
-  ["Used to Be Rich", "You once had a lot of Sura...", "Used to Be Rich Achievement Badge(2).png", "Sura"],
+  ["Used to Be Rich", "You once had a lot of Sura...", "Used to Be Rich Achievement Badge(1).png", "Sura"],
   ["Richest Player", "Have the most Sura!", "Richest Player Achievement Badge(1).png", "Sura"]
 ];
 

@@ -591,14 +591,14 @@ async function loadFriends(client, session) {
     await loadFriends(client,session);
   };
   const searchForm=document.querySelector("#social-search-form");
-  searchForm?.addEventListener("submit",async event=>{
+  if (searchForm) searchForm.onsubmit = async event=>{
     event.preventDefault();
     const q=String(new FormData(searchForm).get("query")||"").trim();
     const output=document.querySelector("#social-search-results");
     const {data:found,error:findError}=await client.from("profiles").select("id,username,display_name,avatar_url").ilike("username",`%${q}%`).neq("id",uid).limit(20);
     if(findError){output.textContent=findError.message;return;}
     output.innerHTML=(found||[]).map(p=>`<a class="search-result" href="profile.html?user=${encodeURIComponent(p.id)}"><img class="profile-avatar" src="${escapeHtml(p.avatar_url||"")}" alt="" onerror="this.style.display='none'"><div><strong>${escapeHtml(p.display_name||p.username)}</strong><p>@${escapeHtml(p.username)}</p></div></a>`).join("")||"<p>No players found.</p>";
-  },{once:true});
+  };
 }
 
 async function renderCharacter(client, userId, selectedId) {

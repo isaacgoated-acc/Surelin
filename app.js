@@ -93,7 +93,7 @@ const pages = {
     eyebrow: "Social",
     heading: "Friends",
     lead: "Keep up with the people you play and create with.",
-    render: () => `<div class="empty-state"><h2>No friends to show yet</h2><p>Friend lists and requests need to be connected to Surelin accounts before live friends can appear here.</p><a href="profile.html">Go to your profile</a></div>`
+    render: () => `<section class="social-layout"><div class="feature-card"><h2>Friend requests</h2><div id="friend-requests"><p>Loading requests...</p></div></div><div class="feature-card"><h2>Your friends</h2><div id="friends-list"><p>Loading friends...</p></div></div><div class="feature-card"><h2>Following</h2><div id="following-list"><p>Loading following...</p></div></div><div class="feature-card"><h2>Find players</h2><form id="social-search-form" class="admin-form"><label for="social-search-query">Username</label><input id="social-search-query" name="query" minlength="2" maxlength="24" placeholder="Search players..." required><button type="submit">Search</button></form><div id="social-search-results"></div></div></section>`
   },
   inventory: {
     title: "Inventory",
@@ -429,7 +429,8 @@ async function loadProfile(client, session) {
   document.querySelector("#profile-edit").hidden = !isOwn;
   const name = profile.display_name || profile.username || "Surelin Player";
   await renderCharacter(client, userId, profile.selected_character_id);
-  card.innerHTML = `<div class="profile-row"><img class="profile-avatar" src="${escapeHtml(profile.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><h2>${escapeHtml(name)}</h2><p class="lead">@${escapeHtml(profile.username)}</p><p>${escapeHtml(profile.bio || "No bio yet.")}</p></div></div><div class="stat-row"><div class="stat"><strong>${Number(profile.level || 1)}</strong><span>Level</span></div><div class="stat"><strong>${Number(profile.sura || 0).toLocaleString()}</strong><span>Sura</span></div></div>`;
+  card.innerHTML = `<div class="profile-row"><img class="profile-avatar" src="${escapeHtml(profile.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><h2>${escapeHtml(name)}</h2><p class="lead">@${escapeHtml(profile.username)}</p><p>${escapeHtml(profile.bio || "No bio yet.")}</p></div></div><div class="stat-row"><div class="stat"><strong>${Number(profile.level || 1)}</strong><span>Level</span></div><div class="stat"><strong>${Number(profile.sura || 0).toLocaleString()}</strong><span>Sura</span></div></div><div id="profile-social-controls"></div>`;
+  await renderRelationshipControls(client, session, profile);
   if (!isOwn) return;
   const form = document.querySelector("#profile-form");
   form.elements.username.value = profile.username || "";
@@ -450,6 +451,151 @@ async function loadProfile(client, session) {
     message.textContent = saveError ? saveError.message : "Profile saved!";
     if (!saveError) await loadProfile(client, session);
   });
+}
+
+const playedBadgeSounds = new Set();
+
+function playBadgeUnlockSound(badgeId) {
+  if (playedBadgeSounds.has(badgeId)) return;
+  playedBadgeSounds.add(badgeId);
+  const candidates = ["assets/badge-unlock.mp3","assets/badge.mp3","assets/badge-sound.mp3","assets/sounds/badge-unlock.mp3","assets/sounds/badge.mp3","assets/badge.wav"];
+  let index = 0;
+  const attempt = () => {
+    if (index >= candidates.length) return;
+    const audio = new Audio(candidates[index++]);
+    audio.preload = "auto";
+    audio.addEventListener("canplaythrough", () => audio.play().catch(() => {}), { once: true });
+    audio.addEventListener("error", attempt, { once: true });
+    audio.load();
+  };
+  attempt();
+}
+
+async function renderRelationshipControls(client, session, profile) {
+  const target = document.querySelector("#profile-social-controls");
+  if (!target) return;
+  const [friendsResult, followersResult, followingResult] = await Promise.all([
+    client.from("friend_requests").select("id,sender_id,receiver_id,status").eq("status","accepted").or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`),
+    client.from("follows").select("follower_id",{count:"exact",head:true}).eq("following_id",profile.id),
+    client.from("follows").select("following_id",{count:"exact",head:true}).eq("follower_id",profile.id)
+  ]);
+  const friendCount = friendsResult.data?.length || 0;
+  const counts = `<div class="social-counts"><span><strong>${friendCount}</strong> friends</span><span><strong>${followersResult.count || 0}</strong> followers</span><span><strong>${followingResult.count || 0}</strong> following</span></div>`;
+  if (!session) {
+    target.innerHTML = counts + '<p><a href="login.html">Log in</a> to add friends or follow players.</p>';
+    return;
+  }
+  if (session.user.id === profile.id) {
+    target.innerHTML = counts;
+    return;
+  }
+  const [requests, followResult] = await Promise.all([
+    client.from("friend_requests").select("id,sender_id,receiver_id,status").or(`and(sender_id.eq.${session.user.id},receiver_id.eq.${profile.id}),and(sender_id.eq.${profile.id},receiver_id.eq.${session.user.id})`).order("created_at",{ascending:false}).limit(5),
+    client.from("follows").select("follower_id").eq("follower_id",session.user.id).eq("following_id",profile.id).maybeSingle()
+  ]);
+  const relation = requests.data?.find(x=>x.status==="accepted") || requests.data?.[0] || null;
+  const isFollowing = !!followResult.data;
+  let friendControl = '<button type="button" data-social-action="add-friend">Add Friend</button>';
+  if (relation?.status === "accepted") friendControl = '<button type="button" data-social-action="remove-friend">Remove Friend</button>';
+  else if (relation?.status === "pending" && relation.sender_id === session.user.id) friendControl = '<button type="button" data-social-action="cancel-request">Cancel Request</button>';
+  else if (relation?.status === "pending" && relation.receiver_id === session.user.id) friendControl = '<div class="social-actions"><button type="button" data-social-action="accept-request">Accept Request</button><button type="button" data-social-action="reject-request">Decline</button></div>';
+  target.innerHTML = counts + `<div class="social-actions" data-request-id="${escapeHtml(relation?.id || "")}" data-target-id="${escapeHtml(profile.id)}">${friendControl}<button type="button" data-social-action="toggle-follow">${isFollowing ? "Unfollow" : "Follow"}</button></div><p id="social-action-message" role="status"></p>`;
+  target.querySelector(".social-actions").addEventListener("click", async event => {
+    const button = event.target.closest("[data-social-action]");
+    if (!button) return;
+    const action = button.dataset.socialAction;
+    const requestId = relation?.id;
+    const message = target.querySelector("#social-action-message");
+    target.querySelectorAll("button").forEach(x=>x.disabled=true);
+    let error = null;
+    if (action === "add-friend") {
+      const result = await client.from("friend_requests").insert({sender_id:session.user.id,receiver_id:profile.id});
+      error = result.error;
+    } else if (action === "cancel-request" || action === "remove-friend") {
+      const result = await client.from("friend_requests").delete().eq("id",requestId);
+      error = result.error;
+    } else if (action === "accept-request") {
+      const {data:ownedBadge} = await client.from("player_inventory").select("asset_id").eq("player_id",session.user.id).eq("asset_type","badge").eq("asset_id","Friendship").maybeSingle();
+      const result = await client.from("friend_requests").update({status:"accepted",updated_at:new Date().toISOString()}).eq("id",requestId);
+      error = result.error;
+      if (!error && !ownedBadge) playBadgeUnlockSound("Friendship");
+    } else if (action === "reject-request") {
+      const result = await client.from("friend_requests").update({status:"rejected",updated_at:new Date().toISOString()}).eq("id",requestId);
+      error = result.error;
+    } else if (action === "toggle-follow") {
+      if (isFollowing) {
+        const result = await client.from("follows").delete().eq("follower_id",session.user.id).eq("following_id",profile.id);
+        error = result.error;
+      } else {
+        const result = await client.from("follows").insert({follower_id:session.user.id,following_id:profile.id});
+        error = result.error;
+      }
+    }
+    if (error) {
+      message.textContent = error.message;
+      target.querySelectorAll("button").forEach(x=>x.disabled=false);
+      return;
+    }
+    await renderRelationshipControls(client,session,profile);
+  });
+}
+
+async function loadFriends(client, session) {
+  const requestsPanel = document.querySelector("#friend-requests");
+  if (!requestsPanel) return;
+  if (!session) {
+    requestsPanel.innerHTML = '<div class="empty-state">Log in to use friends and following.</div>';
+    document.querySelector("#friends-list").innerHTML = "";
+    document.querySelector("#following-list").innerHTML = "";
+    return;
+  }
+  const uid = session.user.id;
+  const [incoming, accepted, following] = await Promise.all([
+    client.from("friend_requests").select("id,sender_id,created_at").eq("receiver_id",uid).eq("status","pending").order("created_at",{ascending:false}),
+    client.from("friend_requests").select("id,sender_id,receiver_id").eq("status","accepted").or(`sender_id.eq.${uid},receiver_id.eq.${uid}`),
+    client.from("follows").select("following_id").eq("follower_id",uid).order("created_at",{ascending:false})
+  ]);
+  const error = incoming.error || accepted.error || following.error;
+  if (error) { requestsPanel.textContent = "Could not load social features: " + error.message; return; }
+  const friendIds = [...new Set((accepted.data||[]).map(x=>x.sender_id===uid?x.receiver_id:x.sender_id))];
+  const followingIds = (following.data||[]).map(x=>x.following_id);
+  const incomingIds = (incoming.data||[]).map(x=>x.sender_id);
+  const allIds = [...new Set([...friendIds,...followingIds,...incomingIds])];
+  const {data:profiles,error:profileError} = allIds.length ? await client.from("profiles").select("id,username,display_name,avatar_url").in("id",allIds) : {data:[],error:null};
+  if (profileError) { requestsPanel.textContent = profileError.message; return; }
+  const byId = new Map((profiles||[]).map(p=>[p.id,p]));
+  const playerCard = (id, extra="") => {
+    const p=byId.get(id);
+    return p ? `<article class="social-player"><a href="profile.html?user=${encodeURIComponent(p.id)}"><img class="profile-avatar" src="${escapeHtml(p.avatar_url||"")}" alt="" onerror="this.style.display='none'"><span><strong>${escapeHtml(p.display_name||p.username)}</strong><small>@${escapeHtml(p.username)}</small></span></a>${extra}</article>` : "";
+  };
+  requestsPanel.innerHTML = (incoming.data||[]).map(r=>playerCard(r.sender_id,`<div class="social-actions"><button type="button" data-accept-request="${r.id}">Accept</button><button type="button" data-reject-request="${r.id}">Decline</button></div>`)).join("") || "<p>No pending friend requests.</p>";
+  document.querySelector("#friends-list").innerHTML = friendIds.map(id=>playerCard(id)).join("") || "<p>You have no friends yet. Search for players to add them.</p>";
+  document.querySelector("#following-list").innerHTML = followingIds.map(id=>playerCard(id)).join("") || "<p>You are not following anyone yet.</p>";
+  requestsPanel.addEventListener("click", async event=>{
+    const accept=event.target.closest("[data-accept-request]");
+    const reject=event.target.closest("[data-reject-request]");
+    const id=accept?.dataset.acceptRequest || reject?.dataset.rejectRequest;
+    if(!id) return;
+    if(accept){
+      const {data:ownedBadge}=await client.from("player_inventory").select("asset_id").eq("player_id",uid).eq("asset_type","badge").eq("asset_id","Friendship").maybeSingle();
+      const {error:saveError}=await client.from("friend_requests").update({status:"accepted",updated_at:new Date().toISOString()}).eq("id",id);
+      if(saveError){requestsPanel.insertAdjacentHTML("beforeend",`<p class="notice">${escapeHtml(saveError.message)}</p>`);return;}
+      if(!ownedBadge) playBadgeUnlockSound("Friendship");
+    } else {
+      const {error:saveError}=await client.from("friend_requests").update({status:"rejected",updated_at:new Date().toISOString()}).eq("id",id);
+      if(saveError){requestsPanel.insertAdjacentHTML("beforeend",`<p class="notice">${escapeHtml(saveError.message)}</p>`);return;}
+    }
+    await loadFriends(client,session);
+  });
+  const searchForm=document.querySelector("#social-search-form");
+  searchForm?.addEventListener("submit",async event=>{
+    event.preventDefault();
+    const q=String(new FormData(searchForm).get("query")||"").trim();
+    const output=document.querySelector("#social-search-results");
+    const {data:found,error:findError}=await client.from("profiles").select("id,username,display_name,avatar_url").ilike("username",`%${q}%`).neq("id",uid).limit(20);
+    if(findError){output.textContent=findError.message;return;}
+    output.innerHTML=(found||[]).map(p=>`<a class="search-result" href="profile.html?user=${encodeURIComponent(p.id)}"><img class="profile-avatar" src="${escapeHtml(p.avatar_url||"")}" alt="" onerror="this.style.display='none'"><div><strong>${escapeHtml(p.display_name||p.username)}</strong><p>@${escapeHtml(p.username)}</p></div></a>`).join("")||"<p>No players found.</p>";
+  },{once:true});
 }
 
 async function renderCharacter(client, userId, selectedId) {
@@ -718,6 +864,7 @@ async function initializeSupabase() {
     if (pageName === "home") await loadAnnouncements(client);
     if (pageName === "downloads") await loadDownloadLinks(client);
     if (pageName === "profile") await loadProfile(client, data.session);
+    if (pageName === "friends") await loadFriends(client, data.session);
     if (pageName === "inventory") { await loadInventory(client, data.session); if (data.session) { const { data: ownProfile } = await client.from("profiles").select("selected_character_id").eq("id", data.session.user.id).maybeSingle(); await renderCharacter(client, data.session.user.id, ownProfile?.selected_character_id); } }
     if (pageName === "search") await searchPlayers(client);
     if (pageName === "chat") await loadChat(client, data.session);

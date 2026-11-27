@@ -65,7 +65,7 @@ const pages = {
     eyebrow: "Player",
     heading: "Profile",
     lead: "Your public player card and achievement showcase.",
-    render: () => `<section id="profile-card" class="feature-card"><p>Loading your profile...</p></section><section id="character-preview" class="feature-card character-preview"><h2>Selected character</h2><div id="character-renderer">Loading character preview...</div></section><section id="profile-edit" class="feature-card profile-edit"><h2>Edit profile</h2><form id="profile-form" class="admin-form"><label for="profile-display-name">Display name</label><input id="profile-display-name" name="display_name" maxlength="32" required><label for="profile-username">Username</label><input id="profile-username" name="username" maxlength="24" required><label for="profile-bio">Bio</label><textarea id="profile-bio" name="bio" maxlength="180"></textarea><label for="profile-avatar">Avatar image URL</label><input id="profile-avatar" name="avatar_url" type="url" placeholder="https://..."><button type="submit">Save profile</button><p id="profile-message" role="status"></p></form></section><div class="section-heading"><h2>Badge showcase</h2><a href="badges.html">Browse badges</a></div>${badgeCards(badges.slice(0, 3))}`
+    render: () => `<section id="profile-card" class="feature-card"><p>Loading your profile...</p></section><section id="character-preview" class="feature-card character-preview"><h2>Selected character</h2><div id="character-renderer">Loading character preview...</div></section><section id="profile-edit" class="feature-card profile-edit"><h2>Edit profile</h2><form id="profile-form" class="admin-form"><label for="profile-display-name">Display name</label><input id="profile-display-name" name="display_name" maxlength="32" required><label for="profile-username">Username</label><input id="profile-username" name="username" maxlength="24" required><label for="profile-bio">Bio</label><textarea id="profile-bio" name="bio" maxlength="180"></textarea><label for="profile-avatar">Avatar image URL</label><input id="profile-avatar" name="avatar_url" type="url" placeholder="https://..."><button type="submit">Save profile</button><p id="profile-message" role="status"></p></form></section><div class="section-heading"><h2>Earned badges</h2><a href="badges.html">Browse badges</a></div><section id="profile-earned-badges"></section>`
   },
   downloads: {
     title: "Download",
@@ -431,6 +431,11 @@ async function loadProfile(client, session) {
   await renderCharacter(client, userId, profile.selected_character_id);
   card.innerHTML = `<div class="profile-row"><img class="profile-avatar" src="${escapeHtml(profile.avatar_url || "")}" alt="" onerror="this.style.display='none'"><div><h2>${escapeHtml(name)}</h2><p class="lead">@${escapeHtml(profile.username)}</p><p>${escapeHtml(profile.bio || "No bio yet.")}</p></div></div><div class="stat-row"><div class="stat"><strong>${Number(profile.level || 1)}</strong><span>Level</span></div><div class="stat"><strong>${Number(profile.sura || 0).toLocaleString()}</strong><span>Sura</span></div></div><div id="profile-social-controls"></div>`;
   await renderRelationshipControls(client, session, profile);
+  const earnedTarget = document.querySelector("#profile-earned-badges");
+  const {data:earnedRows} = await client.from("player_inventory").select("asset_id").eq("player_id",userId).eq("asset_type","badge");
+  const earnedNames = new Set((earnedRows||[]).map(x=>x.asset_id));
+  const earnedBadges = badges.filter(x=>earnedNames.has(x[0]));
+  if (earnedTarget) earnedTarget.innerHTML = earnedBadges.length ? badgeCards(earnedBadges) : "<p>No badges earned yet.</p>";
   if (!isOwn) return;
   const form = document.querySelector("#profile-form");
   form.elements.username.value = profile.username || "";
@@ -509,6 +514,8 @@ async function renderRelationshipControls(client, session, profile) {
     target.querySelectorAll("button").forEach(x=>x.disabled=true);
     let error = null;
     if (action === "add-friend") {
+      const {data:oldRequest} = await client.from("friend_requests").select("id,status").eq("sender_id",session.user.id).eq("receiver_id",profile.id).maybeSingle();
+      if (oldRequest?.status === "rejected") await client.from("friend_requests").delete().eq("id",oldRequest.id);
       const result = await client.from("friend_requests").insert({sender_id:session.user.id,receiver_id:profile.id});
       error = result.error;
     } else if (action === "cancel-request" || action === "remove-friend") {
@@ -571,7 +578,7 @@ async function loadFriends(client, session) {
   requestsPanel.innerHTML = (incoming.data||[]).map(r=>playerCard(r.sender_id,`<div class="social-actions"><button type="button" data-accept-request="${r.id}">Accept</button><button type="button" data-reject-request="${r.id}">Decline</button></div>`)).join("") || "<p>No pending friend requests.</p>";
   document.querySelector("#friends-list").innerHTML = friendIds.map(id=>playerCard(id)).join("") || "<p>You have no friends yet. Search for players to add them.</p>";
   document.querySelector("#following-list").innerHTML = followingIds.map(id=>playerCard(id)).join("") || "<p>You are not following anyone yet.</p>";
-  requestsPanel.addEventListener("click", async event=>{
+  requestsPanel.onclick = async event=>{
     const accept=event.target.closest("[data-accept-request]");
     const reject=event.target.closest("[data-reject-request]");
     const id=accept?.dataset.acceptRequest || reject?.dataset.rejectRequest;
@@ -586,7 +593,7 @@ async function loadFriends(client, session) {
       if(saveError){requestsPanel.insertAdjacentHTML("beforeend",`<p class="notice">${escapeHtml(saveError.message)}</p>`);return;}
     }
     await loadFriends(client,session);
-  });
+  };
   const searchForm=document.querySelector("#social-search-form");
   searchForm?.addEventListener("submit",async event=>{
     event.preventDefault();
@@ -694,10 +701,12 @@ async function loadInventory(client, session) {
     characters = result.data || [];
   }
   const { data: ownProfile } = await client.from("profiles").select("selected_character_id").eq("id", session.user.id).maybeSingle();
-  panel.innerHTML = `<h2>Your items</h2><div class="inventory-grid">${(data || []).map(item => {
+  const ownedBadges = (data || []).filter(x => x.asset_type === "badge").map(x => x.asset_id);
+  const ownedBadgeCards = badges.filter(x => ownedBadges.includes(x[0]));
+  panel.innerHTML = `<h2>Your items</h2><div class="inventory-grid">${(data || []).filter(x => x.asset_type !== "badge").map(item => {
     const c = characters.find(x => String(x.id) === String(item.asset_id));
     return `<article class="inventory-item"><strong>${escapeHtml(c?.name || (item.asset_type + " #" + item.asset_id))}</strong><span>${escapeHtml(item.asset_type)}</span>${item.asset_type === "character" ? `<button type="button" data-preview-character="${escapeHtml(item.asset_id)}">Preview in 3D</button><button type="button" data-select-character="${escapeHtml(item.asset_id)}">Select character</button>` : ""}</article>`;
-  }).join("") || "<p>Your inventory is empty.</p>"}</div>`;
+  }).join("") || "<p>Your inventory is empty.</p>"}</div><h2>Badges</h2>${ownedBadgeCards.length ? badgeCards(ownedBadgeCards) : "<p>No badges earned yet.</p>"}`;
   panel.addEventListener("click", async event => {
     const previewButton = event.target.closest("[data-preview-character]");
     if (previewButton) { await renderCharacter(client, session.user.id, Number(previewButton.dataset.previewCharacter)); return; }

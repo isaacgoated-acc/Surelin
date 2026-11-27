@@ -463,13 +463,13 @@ const playedBadgeSounds = new Set();
 function playBadgeUnlockSound(badgeId) {
   if (playedBadgeSounds.has(badgeId)) return;
   playedBadgeSounds.add(badgeId);
-  const candidates = ["assets/badge-unlock.mp3","assets/badge.mp3","assets/badge-sound.mp3","assets/sounds/badge-unlock.mp3","assets/sounds/badge.mp3","assets/badge.wav"];
+  const candidates = ["assets/badge-unlock.mp3","assets/badge-earned.mp3","assets/badge.mp3","assets/badge-sound.mp3","assets/badgesound.mp3","assets/Badge.mp3","assets/sounds/badge-unlock.mp3","assets/sounds/badge.mp3","assets/sounds/achievement-unlocked.mp3","assets/badge-unlock.wav","assets/badge.wav"];
   let index = 0;
   const attempt = () => {
     if (index >= candidates.length) return;
     const audio = new Audio(candidates[index++]);
     audio.preload = "auto";
-    audio.addEventListener("canplaythrough", () => audio.play().catch(() => {}), { once: true });
+    audio.addEventListener("canplay", () => audio.play().catch(() => {}), { once: true });
     audio.addEventListener("error", attempt, { once: true });
     audio.load();
   };
@@ -479,13 +479,9 @@ function playBadgeUnlockSound(badgeId) {
 async function renderRelationshipControls(client, session, profile) {
   const target = document.querySelector("#profile-social-controls");
   if (!target) return;
-  const [friendsResult, followersResult, followingResult] = await Promise.all([
-    client.from("friend_requests").select("id,sender_id,receiver_id,status").eq("status","accepted").or(`sender_id.eq.${profile.id},receiver_id.eq.${profile.id}`),
-    client.from("follows").select("follower_id",{count:"exact",head:true}).eq("following_id",profile.id),
-    client.from("follows").select("following_id",{count:"exact",head:true}).eq("follower_id",profile.id)
-  ]);
-  const friendCount = friendsResult.data?.length || 0;
-  const counts = `<div class="social-counts"><span><strong>${friendCount}</strong> friends</span><span><strong>${followersResult.count || 0}</strong> followers</span><span><strong>${followingResult.count || 0}</strong> following</span></div>`;
+  const {data:socialCountRows} = await client.rpc("get_social_counts",{target_user:profile.id});
+  const socialCounts = socialCountRows?.[0] || {friend_count:0,followers_count:0,following_count:0};
+  const counts = `<div class="social-counts"><span><strong>${Number(socialCounts.friend_count||0)}</strong> friends</span><span><strong>${Number(socialCounts.followers_count||0)}</strong> followers</span><span><strong>${Number(socialCounts.following_count||0)}</strong> following</span></div>`;
   if (!session) {
     target.innerHTML = counts + '<p><a href="login.html">Log in</a> to add friends or follow players.</p>';
     return;
@@ -845,6 +841,7 @@ async function initializeSupabase() {
     const indicator = document.querySelector("#auth-indicator");
     const action = document.querySelector("#account-action");
     if (data.session) {
+      client.channel("surelin-badge-sounds-" + data.session.user.id).on("postgres_changes",{event:"INSERT",schema:"public",table:"player_inventory",filter:`player_id=eq.${data.session.user.id}`},payload=>{if(payload.new?.asset_type==="badge")playBadgeUnlockSound(payload.new.asset_id);}).subscribe();
       const { data: isStaff } = await client.rpc("is_surelin_staff");
       const { data: currentProfile } = await client.from("profiles").select("username").eq("id", data.session.user.id).maybeSingle();
       const accountUsername = String(currentProfile?.username || data.session.user.user_metadata?.username || "").trim().toLowerCase();
